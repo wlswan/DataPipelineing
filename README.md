@@ -219,9 +219,28 @@ docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
   --bootstrap-server localhost:9092 --topic factory.roomenv --from-beginning
 ```
 
-> **범위 참고:** `index.html`(브라우저용 3D 시각화 데모)과 Kafka Streams 스키마 정규화 /
-> TimescaleDB 적재 / WebSocket 백엔드는 이번 파이프라인과 무관하게 범위 밖이다. 지금은
-> "Modbus/MQTT 값이 실제로 Kafka까지 흐르는지 눈으로 확인"하는 데만 집중한다.
+> **범위 참고:** `index.html`(물리 시뮬레이션이 붙은 전체 3D 데모)과 TimescaleDB 적재는
+> 아직 범위 밖이다. Kafka Streams 정규화 / WebSocket 릴레이는 아래 절에서 다룬다.
+
+### 정규화(Kafka Streams) + 실시간 WebSocket 릴레이
+
+`factory.modbus`(1초마다 확정 발행되는 스트림)와 `factory.roomenv`(그때그때 온 최신값을
+유지하는 테이블)를 라인ID 기준으로 join해서, 하나의 통일된 스키마로 `factory.linestate`에
+다시 쓰는 Kafka Streams 앱과, 그 결과를 저장 없이 곧바로 브라우저로 relay하는 WebSocket
+백엔드가 있다.
+
+```bash
+./gradlew runLineStateStreams      # 터미널 3: factory.modbus + factory.roomenv -> factory.linestate
+./gradlew runLiveWebSocketServer   # 터미널 4: factory.linestate -> WebSocket(8081)으로 브라우저에 relay
+```
+
+- `factory.linestate` 메시지 예: `{"lineId":"line1","fireActual":220.0,"moldActual":200.3,"servedCount":5225,"roomTemp":21.1,"roomHumidity":40.5,"ts":...}`
+- 이 뒤로 이어지는 두 갈래(콜드 패스: DB sink → TimescaleDB / 핫 패스: 이 WebSocket → 화면)
+  중 지금은 핫 패스만 구현돼 있다. DB 적재는 여전히 범위 밖.
+- 브라우저에서 `src/main/java/com/factory/sim/live-monitor.html`을 열면(파일 직접 열기,
+  `ws://localhost:8081`에 접속) 라인별 카드에 화력/몰드온도, 실내온습도, 생산개수가
+  실시간으로 계속 갱신되는 걸 확인할 수 있다. 최소한의 Three.js 뷰어로, 데이터가 도착할
+  때마다 카드가 잠깐 강조됐다가 원래대로 돌아온다.
 
 ## 사용한 라이브러리
 
@@ -231,3 +250,5 @@ docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
 | MQTT 클라이언트 | `org.eclipse.paho:org.eclipse.paho.client.mqttv3` | 1.2.5 |
 | 임베디드 MQTT 브로커 | `io.moquette:moquette-broker` | 0.17 |
 | Kafka producer (KafkaBridge용) | `org.apache.kafka:kafka-clients` | 3.8.0 |
+| Kafka Streams (정규화 조인용) | `org.apache.kafka:kafka-streams` | 3.8.0 |
+| WebSocket 서버 (실시간 relay용) | `org.java-websocket:Java-WebSocket` | 1.5.6 |

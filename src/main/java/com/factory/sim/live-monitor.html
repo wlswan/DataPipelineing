@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>Live Monitor — factory.linestate</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#111417;color:#e8e6df;
+    font-family:"Helvetica Neue",Arial,system-ui,sans-serif;}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #hud{
+    position:fixed;top:12px;left:12px;z-index:10;width:340px;
+    background:rgba(20,22,26,.82);border:1px solid #333;border-radius:10px;
+    padding:12px 14px;backdrop-filter:blur(3px);
+  }
+  #hud h1{margin:0 0 8px;font-size:14px}
+  #hud .status{font-size:12px;margin-bottom:8px}
+  #hud .status.ok{color:#5ee08a}
+  #hud .status.bad{color:#ff6b6b}
+  #log{
+    position:fixed;top:12px;right:12px;z-index:10;width:380px;max-height:70vh;
+    overflow-y:auto;background:rgba(20,22,26,.82);border:1px solid #333;border-radius:10px;
+    padding:10px 12px;font-size:11px;line-height:1.5;
+  }
+  #log div{white-space:pre-wrap;word-break:break-all;border-bottom:1px solid #2a2d31;padding:3px 0}
+  #log div:last-child{border-bottom:none}
+
+  /* ---------------------------------------------------------------- history overlay */
+  :root{
+    --series-fire:#d95926; --series-mold:#3987e5;
+    --hy-surface:#1a1d21; --hy-ink:#e8e6df; --hy-ink-dim:#9aa0a6; --hy-muted:#7d838a;
+    --hy-grid:rgba(255,255,255,.08); --hy-border:#31363c;
+  }
+  #historyOverlay{
+    position:fixed;inset:0;z-index:20;background:rgba(8,9,10,.6);
+    display:flex;align-items:center;justify-content:center;
+  }
+  #historyOverlay[hidden]{display:none}
+  .history-panel{
+    width:min(720px,92vw);background:var(--hy-surface);border:1px solid var(--hy-border);
+    border-radius:12px;padding:18px 20px 16px;box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .history-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .history-head h2{margin:0;font-size:15px;font-weight:700;color:var(--hy-ink)}
+  #historyClose{
+    background:none;border:1px solid var(--hy-border);color:var(--hy-ink-dim);
+    border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:13px;line-height:1;
+  }
+  #historyClose:hover{color:var(--hy-ink);border-color:var(--hy-ink-dim)}
+  #historyClose:focus-visible{outline:2px solid var(--series-mold);outline-offset:1px}
+  .history-legend{display:flex;gap:16px;margin:10px 0 4px;font-size:12px;color:var(--hy-ink-dim)}
+  .history-legend span{display:inline-flex;align-items:center;gap:6px}
+  .history-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .history-chart-wrap{position:relative;margin-top:6px;overflow-x:auto}
+  #historyCanvas{display:block;width:100%;height:220px}
+  .history-tooltip{
+    position:absolute;pointer-events:none;background:rgba(12,13,15,.95);
+    border:1px solid var(--hy-border);border-radius:6px;padding:6px 9px;font-size:11.5px;
+    color:var(--hy-ink);line-height:1.6;transform:translate(-50%,-110%);white-space:nowrap;
+  }
+  .history-tooltip[hidden]{display:none}
+  .history-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+  #historyStatus{font-size:11.5px;color:var(--hy-muted)}
+  #historyTableToggle{
+    background:none;border:none;color:var(--hy-ink-dim);font-size:11.5px;
+    text-decoration:underline;cursor:pointer;padding:0;
+  }
+  #historyTableToggle:focus-visible{outline:2px solid var(--series-mold);outline-offset:1px}
+  .history-table-wrap{max-height:220px;overflow-y:auto;margin-top:8px;font-size:11.5px}
+  .history-table-wrap[hidden]{display:none}
+  .history-table-wrap table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  .history-table-wrap th,.history-table-wrap td{
+    text-align:right;padding:4px 8px;border-bottom:1px solid var(--hy-grid);color:var(--hy-ink-dim);
+  }
+  .history-table-wrap th:first-child,.history-table-wrap td:first-child{text-align:left;color:var(--hy-ink)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">
+  <h1>Live Monitor</h1>
+  <div id="status" class="status bad">연결 대기중...</div>
+  <div>WS: <span id="wsUrl"></span></div>
+  <div style="margin-top:6px;color:#9aa0a6">factory.linestate 정규화 스트림을 받아 라인별 카드로 표시. 카드를 클릭하면 최근 이력을 봅니다.</div>
+</div>
+<div id="log"></div>
+
+<div id="historyOverlay" hidden>
+  <div class="history-panel">
+    <div class="history-head">
+      <h2 id="historyTitle">line1</h2>
+      <button id="historyClose" aria-label="닫기">✕</button>
+    </div>
+    <div class="history-legend">
+      <span><i style="background:var(--series-fire)"></i>화력(fire)</span>
+      <span><i style="background:var(--series-mold)"></i>몰드(mold)</span>
+    </div>
+    <div class="history-chart-wrap">
+      <canvas id="historyCanvas" width="680" height="220"></canvas>
+      <div id="historyTooltip" class="history-tooltip" hidden></div>
+    </div>
+    <div class="history-table-wrap" id="historyTableWrap" hidden></div>
+    <div class="history-foot">
+      <span id="historyStatus"></span>
+      <button id="historyTableToggle">표로 보기</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script>
+// ---------------------------------------------------------------- WebSocket
+const params = new URLSearchParams(location.search);
+const wsUrl = params.get("ws") || "ws://localhost:8081";
+document.getElementById("wsUrl").textContent = wsUrl;
+
+const statusEl = document.getElementById("status");
+const logEl = document.getElementById("log");
+const MAX_LOG_LINES = 40;
+
+function appendLog(text) {
+  const line = document.createElement("div");
+  const now = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+  line.textContent = `[${now}] ${text}`;
+  logEl.prepend(line);
+  while (logEl.children.length > MAX_LOG_LINES) {
+    logEl.removeChild(logEl.lastChild);
+  }
+}
+
+// lineId -> 최신 상태 + 카드(sprite) 참조
+const lines = new Map();
+
+function connect() {
+  const ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    statusEl.textContent = "연결됨";
+    statusEl.className = "status ok";
+    appendLog("WebSocket 연결됨: " + wsUrl);
+  };
+
+  ws.onclose = () => {
+    statusEl.textContent = "연결 끊김 - 3초 후 재시도";
+    statusEl.className = "status bad";
+    appendLog("WebSocket 연결 종료, 재접속 시도");
+    setTimeout(connect, 3000);
+  };
+
+  ws.onerror = () => {
+    ws.close();
+  };
+
+  ws.onmessage = (event) => {
+    let data;
+    try {
+      data = JSON.parse(event.data);
+    } catch (e) {
+      appendLog("JSON 파싱 실패: " + event.data);
+      return;
+    }
+    appendLog(
+      `${data.lineId}  fire=${data.fireActual}°C  mold=${data.moldActual}°C  ` +
+      `room=${data.roomTemp}°C/${data.roomHumidity}%  served=${data.servedCount}`
+    );
+    updateLineCard(data);
+  };
+}
+connect();
+
+// ---------------------------------------------------------------- Three.js scene
+const app = document.getElementById("app");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x111417, 1);
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 2, 14);
+camera.lookAt(0, 0, 0);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+
+window.addEventListener("resize", () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const CARD_W = 3.2, CARD_H = 2.0;
+
+function makeCardTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 320;
+  return { canvas, ctx: canvas.getContext("2d"), texture: new THREE.CanvasTexture(canvas) };
+}
+
+function drawCard(card, data, flash) {
+  const { canvas, ctx, texture } = card;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = flash ? "#24312a" : "#1b1e22";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = flash ? "#5ee08a" : "#3a3f45";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(3, 3, canvas.width - 6, canvas.height - 6);
+
+  ctx.fillStyle = "#e8e6df";
+  ctx.font = "bold 40px sans-serif";
+  ctx.fillText(data.lineId, 24, 56);
+
+  ctx.font = "32px sans-serif";
+  ctx.fillStyle = "#ff9d5c";
+  ctx.fillText(`fire  ${data.fireActual.toFixed(1)} C`, 24, 120);
+  ctx.fillStyle = "#7cc7ff";
+  ctx.fillText(`mold  ${data.moldActual.toFixed(1)} C`, 24, 166);
+  ctx.fillStyle = "#c9e08a";
+  ctx.fillText(`room  ${data.roomTemp.toFixed(1)} C / ${data.roomHumidity.toFixed(0)}%`, 24, 212);
+  ctx.fillStyle = "#9aa0a6";
+  ctx.font = "24px sans-serif";
+  ctx.fillText(`served ${data.servedCount}`, 24, 260);
+
+  texture.needsUpdate = true;
+}
+
+function layoutCards() {
+  const ids = Array.from(lines.keys()).sort();
+  const gap = CARD_W + 0.6;
+  const startX = -((ids.length - 1) * gap) / 2;
+  ids.forEach((id, i) => {
+    lines.get(id).mesh.position.x = startX + i * gap;
+  });
+}
+
+function updateLineCard(data) {
+  let entry = lines.get(data.lineId);
+  if (!entry) {
+    const card = makeCardTexture();
+    const material = new THREE.MeshBasicMaterial({ map: card.texture });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(CARD_W, CARD_H), material);
+    mesh.userData.lineId = data.lineId;
+    scene.add(mesh);
+    entry = { card, mesh, lastUpdate: 0 };
+    lines.set(data.lineId, entry);
+    layoutCards();
+  }
+  entry.data = data;
+  entry.lastUpdate = performance.now();
+  drawCard(entry.card, data, true);
+
+  // 이력 모달이 이 라인으로 열려 있으면, DB를 다시 조회하지 않고 지금 막 받은 실시간
+  // 값을 그대로 이어붙인다 — 처음 열 때 과거분만 DB에서 채우고, 그 이후는 이미 흐르고
+  // 있는 이 WebSocket 스트림을 재사용하는 것.
+  if (currentHistoryLineId === data.lineId) {
+    appendLiveHistoryPoint(data);
+  }
+}
+
+// 렌더 루프: 데이터 도착과 무관하게 계속 돌면서, 최근 갱신된 카드는 잠깐 강조했다가
+// 원래 색으로 되돌린다 (값이 "계속 찍히고 있는지" 눈으로 바로 확인하기 위한 용도).
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  for (const entry of lines.values()) {
+    if (entry.data && now - entry.lastUpdate > 400) {
+      drawCard(entry.card, entry.data, false);
+      entry.lastUpdate = Infinity; // 한 번만 되돌리면 되므로 다시 안 걸리게 함
+    }
+  }
+  renderer.render(scene, camera);
+}
+animate();
+
+// ---------------------------------------------------------------- 카드 클릭 -> 이력 조회
+const historyUrl = params.get("history") || "http://localhost:8083";
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function pointerToNdc(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+
+function pickLineId(event) {
+  pointerToNdc(event);
+  raycaster.setFromCamera(pointer, camera);
+  const meshes = Array.from(lines.values()).map((e) => e.mesh);
+  const hit = raycaster.intersectObjects(meshes)[0];
+  return hit ? hit.object.userData.lineId : null;
+}
+
+renderer.domElement.addEventListener("click", (event) => {
+  const lineId = pickLineId(event);
+  if (lineId) {
+    openHistory(lineId);
+  }
+});
+
+renderer.domElement.addEventListener("mousemove", (event) => {
+  renderer.domElement.style.cursor = pickLineId(event) ? "pointer" : "default";
+});
+
+const historyOverlay = document.getElementById("historyOverlay");
+const historyTitleEl = document.getElementById("historyTitle");
+const historyStatusEl = document.getElementById("historyStatus");
+const historyCanvas = document.getElementById("historyCanvas");
+const historyTooltip = document.getElementById("historyTooltip");
+const historyTableWrap = document.getElementById("historyTableWrap");
+const historyTableToggle = document.getElementById("historyTableToggle");
+const hctx = historyCanvas.getContext("2d");
+
+const HISTORY_MINUTES = 15;
+let currentHistoryRows = [];
+let currentHistoryLineId = null;
+let tableVisible = false;
+
+function closeHistory() {
+  historyOverlay.hidden = true;
+  currentHistoryLineId = null; // 닫히면 더 이상 실시간 이어붙이기를 안 하도록
+}
+
+document.getElementById("historyClose").addEventListener("click", closeHistory);
+historyOverlay.addEventListener("click", (event) => {
+  if (event.target === historyOverlay) {
+    closeHistory();
+  }
+});
+
+function appendLiveHistoryPoint(data) {
+  currentHistoryRows.push(data);
+  const cutoff = Date.now() - HISTORY_MINUTES * 60 * 1000;
+  currentHistoryRows = currentHistoryRows.filter((r) => r.ts >= cutoff);
+  if (tableVisible) {
+    renderHistoryTable(currentHistoryRows);
+  } else {
+    drawHistoryChart(currentHistoryRows);
+  }
+  historyStatusEl.textContent = `${currentHistoryRows.length}건 · 실시간 갱신 중`;
+}
+
+historyTableToggle.addEventListener("click", () => {
+  tableVisible = !tableVisible;
+  historyTableWrap.hidden = !tableVisible;
+  historyTableToggle.textContent = tableVisible ? "차트로 보기" : "표로 보기";
+  if (tableVisible) {
+    renderHistoryTable(currentHistoryRows);
+  }
+});
+
+async function openHistory(lineId) {
+  historyTitleEl.textContent = `${lineId} — 최근 ${HISTORY_MINUTES}분`;
+  historyOverlay.hidden = false;
+  historyStatusEl.textContent = "불러오는 중...";
+  tableVisible = false;
+  historyTableWrap.hidden = true;
+  historyTableToggle.textContent = "표로 보기";
+  currentHistoryLineId = null; // 과거분을 다 채우기 전엔 실시간 이어붙이기를 잠시 막아둔다
+
+  try {
+    const res = await fetch(`${historyUrl}/history?lineId=${encodeURIComponent(lineId)}&minutes=${HISTORY_MINUTES}`);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+    currentHistoryRows = await res.json();
+    if (currentHistoryRows.length === 0) {
+      historyStatusEl.textContent = "이 구간엔 데이터가 없습니다";
+      hctx.clearRect(0, 0, historyCanvas.width, historyCanvas.height);
+    } else {
+      drawHistoryChart(currentHistoryRows);
+      historyStatusEl.textContent = `${currentHistoryRows.length}건 · TimescaleDB`;
+    }
+    // 과거분 로딩이 끝난 지금부터, 이 라인의 새 WebSocket 메시지를 실시간으로 이어붙인다.
+    currentHistoryLineId = lineId;
+  } catch (e) {
+    historyStatusEl.textContent = "불러오기 실패: " + e.message;
+  }
+}
+
+// 화력/몰드 둘 다 같은 단위(°C)라 축 하나만 공유한다 (두 개의 y축을 쓰지 않는다).
+function drawHistoryChart(rows) {
+  const width = historyCanvas.width;
+  const height = historyCanvas.height;
+  const pad = { top: 10, right: 14, bottom: 22, left: 40 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+
+  const values = rows.flatMap((r) => [r.fireActual, r.moldActual]);
+  const minV = Math.min(...values);
+  const maxV = Math.max(...values);
+  const vSpan = Math.max(maxV - minV, 1);
+  const yPad = vSpan * 0.15;
+  const yMin = minV - yPad;
+  const yMax = maxV + yPad;
+
+  const tMin = rows[0].ts;
+  const tMax = rows[rows.length - 1].ts;
+  const tSpan = Math.max(tMax - tMin, 1);
+
+  const xOf = (ts) => pad.left + ((ts - tMin) / tSpan) * plotW;
+  const yOf = (v) => pad.top + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+
+  hctx.clearRect(0, 0, width, height);
+
+  // 그리드 + y축 눈금 (recessive: 얇고 낮은 대비)
+  hctx.strokeStyle = "rgba(255,255,255,.08)";
+  hctx.lineWidth = 1;
+  hctx.fillStyle = "#7d838a";
+  hctx.font = "10px sans-serif";
+  hctx.textAlign = "right";
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++) {
+    const v = yMin + ((yMax - yMin) * i) / ticks;
+    const y = yOf(v);
+    hctx.beginPath();
+    hctx.moveTo(pad.left, y + 0.5);
+    hctx.lineTo(width - pad.right, y + 0.5);
+    hctx.stroke();
+    hctx.fillText(v.toFixed(0), pad.left - 6, y + 3);
+  }
+
+  // x축 시간 라벨 (시작 / 끝)
+  hctx.textAlign = "center";
+  const fmt = (ts) => new Date(ts).toLocaleTimeString("ko-KR", { hour12: false });
+  hctx.fillText(fmt(tMin), pad.left + 28, height - 6);
+  hctx.fillText(fmt(tMax), width - pad.right - 28, height - 6);
+
+  const drawSeries = (key, color) => {
+    hctx.strokeStyle = color;
+    hctx.lineWidth = 2;
+    hctx.lineJoin = "round";
+    hctx.lineCap = "round";
+    hctx.beginPath();
+    rows.forEach((r, i) => {
+      const x = xOf(r.ts);
+      const y = yOf(r[key]);
+      if (i === 0) {
+        hctx.moveTo(x, y);
+      } else {
+        hctx.lineTo(x, y);
+      }
+    });
+    hctx.stroke();
+
+    // 마지막 값(현재값) 강조 — emphasized endpoint
+    const last = rows[rows.length - 1];
+    hctx.beginPath();
+    hctx.arc(xOf(last.ts), yOf(last[key]), 3.5, 0, Math.PI * 2);
+    hctx.fillStyle = color;
+    hctx.fill();
+  };
+
+  drawSeries("fireActual", "#d95926");
+  drawSeries("moldActual", "#3987e5");
+
+  // hover crosshair + 툴팁
+  historyCanvas.onmousemove = (event) => {
+    const rect = historyCanvas.getBoundingClientRect();
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+    const mx = (event.clientX - rect.left) * scaleX;
+
+    let nearest = rows[0];
+    let nearestDist = Infinity;
+    for (const r of rows) {
+      const d = Math.abs(xOf(r.ts) - mx);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = r;
+      }
+    }
+
+    drawHistoryChart(rows); // 크로스헤어 그리기 전에 깨끗한 상태로 다시 그림
+    const x = xOf(nearest.ts);
+    hctx.strokeStyle = "rgba(255,255,255,.25)";
+    hctx.lineWidth = 1;
+    hctx.beginPath();
+    hctx.moveTo(x, pad.top);
+    hctx.lineTo(x, height - pad.bottom);
+    hctx.stroke();
+
+    historyTooltip.hidden = false;
+    historyTooltip.style.left = (x / scaleX) + "px";
+    historyTooltip.style.top = (yOf(nearest.fireActual) / scaleY) + "px";
+    historyTooltip.innerHTML =
+      `${fmt(nearest.ts)}<br>화력 ${nearest.fireActual.toFixed(1)}°C · 몰드 ${nearest.moldActual.toFixed(1)}°C`;
+  };
+  historyCanvas.onmouseleave = () => {
+    historyTooltip.hidden = true;
+    drawHistoryChart(rows);
+  };
+}
+
+function renderHistoryTable(rows) {
+  const fmt = (ts) => new Date(ts).toLocaleTimeString("ko-KR", { hour12: false });
+  const rowsHtml = rows
+    .slice()
+    .reverse()
+    .map(
+      (r) =>
+        `<tr><td>${fmt(r.ts)}</td><td>${r.fireActual.toFixed(1)}</td><td>${r.moldActual.toFixed(1)}</td>` +
+        `<td>${r.roomTemp.toFixed(1)}</td><td>${r.roomHumidity.toFixed(0)}</td><td>${r.servedCount}</td></tr>`
+    )
+    .join("");
+  historyTableWrap.innerHTML =
+    `<table><thead><tr><th>시각</th><th>화력</th><th>몰드</th><th>실내온도</th><th>습도</th><th>생산수</th></tr></thead>` +
+    `<tbody>${rowsHtml}</tbody></table>`;
+}
+</script>
+</body>
+</html>

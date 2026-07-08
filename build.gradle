@@ -23,6 +23,15 @@ dependencies {
     // Modbus/MQTT 값을 Kafka로 직접 발행하는 KafkaBridge용 Kafka producer 클라이언트
     implementation 'org.apache.kafka:kafka-clients:3.8.0'
 
+    // factory.modbus / factory.roomenv 를 라인ID 기준으로 조인/정규화하는 Kafka Streams 앱용
+    implementation 'org.apache.kafka:kafka-streams:3.8.0'
+
+    // 정규화된 토픽(factory.linestate)을 구독해서 브라우저로 그대로 릴레이하는 WebSocket 서버
+    implementation 'org.java-websocket:Java-WebSocket:1.5.6'
+
+    // factory.linestate를 TimescaleDB(PostgreSQL 호환)에 적재하는 DB sink용 JDBC 드라이버
+    implementation 'org.postgresql:postgresql:42.7.4'
+
     // j2mod/moquette가 사용하는 SLF4J 로깅을 콘솔에 출력해주는 구현체
     runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
 
@@ -76,5 +85,45 @@ tasks.register('runKafkaBridge', JavaExec) {
     description = 'Modbus/MQTT 값을 Kafka로 직접 발행하는 브릿지 실행'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'com.factory.sim.bridge.KafkaBridge'
+    jvmArgs '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+}
+
+// factory.modbus + factory.roomenv 를 라인ID로 join/정규화해서 factory.linestate에 다시 쓰는
+// Kafka Streams 앱. 사용법: ./gradlew runLineStateStreams
+tasks.register('runLineStateStreams', JavaExec) {
+    group = 'application'
+    description = 'factory.modbus/factory.roomenv를 정규화해 factory.linestate로 발행하는 Kafka Streams 앱 실행'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.factory.sim.streams.LineStateStreams'
+    jvmArgs '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+}
+
+// factory.linestate 를 구독해서 브라우저(WebSocket)로 그대로 relay하는 핫 패스 백엔드.
+// 사용법: ./gradlew runLiveWebSocketServer
+tasks.register('runLiveWebSocketServer', JavaExec) {
+    group = 'application'
+    description = 'factory.linestate를 WebSocket으로 브라우저에 relay하는 서버 실행'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.factory.sim.ws.LiveWebSocketServer'
+    jvmArgs '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+}
+
+// factory.linestate 를 독립된 컨슈머 그룹으로 구독해서 TimescaleDB에 적재하는 콜드 패스 백엔드.
+// 사용법: ./gradlew runLineStateDbSink
+tasks.register('runLineStateDbSink', JavaExec) {
+    group = 'application'
+    description = 'factory.linestate를 TimescaleDB(line_state 하이퍼테이블)에 적재하는 DB sink 실행'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.factory.sim.db.LineStateDbSink'
+    jvmArgs '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
+}
+
+// line_state 하이퍼테이블의 이력을 브라우저(live-monitor.html)가 조회할 수 있게 여는 HTTP 서버.
+// 사용법: ./gradlew runLineHistoryServer
+tasks.register('runLineHistoryServer', JavaExec) {
+    group = 'application'
+    description = 'line_state 이력을 GET /history 로 조회할 수 있게 하는 HTTP 서버 실행'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.factory.sim.db.LineHistoryServer'
     jvmArgs '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dstderr.encoding=UTF-8'
 }

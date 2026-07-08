@@ -37,5 +37,30 @@ services:
     depends_on:
       - kafka
 
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: factory-timescaledb
+    ports:
+      # 호스트(윈도우)에서 psql/JDBC로 접속할 때 쓰는 포트.
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: factory
+      POSTGRES_PASSWORD: factory
+      POSTGRES_DB: factory
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer:latest
+    container_name: factory-adminer
+    ports:
+      # 브라우저에서 http://localhost:8082 로 접속해서 TimescaleDB 데이터를 확인.
+      - "8082:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: timescaledb
+    depends_on:
+      - timescaledb
+
 volumes:
   kafka-data:
+  timescale-data:
