@@ -1,0 +1,2770 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>붕어빵 Machine — Taiyaki Oven Sim</title>
+<style>
+  :root{
+    --ember:#ff8a3c; --batter:#f3e2b0; --gold:#b5701f;
+    --panel-edge:#3a2e23; --ink:#f6ead4; --ink-dim:#b9a886;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#282c34;color:var(--ink);
+    font-family:"Helvetica Neue",Arial,system-ui,sans-serif;}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #panel{
+    position:fixed;top:16px;left:16px;width:268px;z-index:10;
+    background:linear-gradient(180deg,#241d17 0%,#1a140f 100%);
+    border:1px solid var(--panel-edge);border-radius:12px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04);
+    padding:16px 16px 14px;backdrop-filter:blur(4px);
+  }
+  #panel h1{margin:0 0 2px;font-size:15px;letter-spacing:.02em;font-weight:700;
+    display:flex;align-items:baseline;gap:8px}
+  #panel h1 .kr{color:var(--ember);font-weight:800}
+  #panel .sub{margin:0 0 14px;font-size:11px;color:var(--ink-dim);letter-spacing:.04em}
+  .field{margin:0 0 12px}
+  .field label{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-dim);margin-bottom:6px}
+  .field label b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:12px;letter-spacing:0}
+  select{width:100%;appearance:none;background:#15100c;color:var(--ink);
+    border:1px solid var(--panel-edge);border-radius:7px;padding:7px 9px;font-size:13px;cursor:pointer}
+  select:focus-visible,input:focus-visible{outline:2px solid var(--ember);outline-offset:1px}
+  input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:3px;
+    background:linear-gradient(90deg,#5b3c1f,var(--ember));outline:none;margin:6px 0 0}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
+    background:#fff;border:2px solid var(--ember);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;
+    border:2px solid var(--ember);cursor:pointer}
+  .readout{margin-top:13px;padding-top:12px;border-top:1px dashed var(--panel-edge);
+    font-family:"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace;font-size:11px;line-height:1.7;color:var(--ink-dim)}
+  .readout span{color:var(--ink);float:right;font-variant-numeric:tabular-nums}
+  .readout .hot{color:var(--ember)}
+  .readout .cold{color:#a8d8a8}
+  .readout .warn{color:#e8c46a}
+  .readout .defect{color:#e07070}
+  .readout .divider{border:none;border-top:1px dashed #2e2620;margin:5px 0}
+  .hint{margin-top:10px;font-size:10px;color:#7c6f5c;letter-spacing:.03em}
+  .control-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    background: rgba(255,255,255,0.03);
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--panel-edge);
+  }
+  .play-btn {
+    background: var(--ember);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: inherit;
+    transition: background 0.2s, transform 0.1s;
+    min-width: 76px;
+  }
+  .play-btn:hover {
+    background: #e0600f;
+  }
+  .play-btn:active {
+    transform: scale(0.95);
+  }
+  .play-btn.paused {
+    background: #28a745;
+  }
+  .play-btn.paused:hover {
+    background: #218838;
+  }
+  .field.inline {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+    flex: 1;
+  }
+  .field.inline label {
+    margin-bottom: 2px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+  }
+  @media (max-width:560px){#panel{width:auto;left:10px;right:10px;top:10px}}
+  .tab-btn {
+    border: 1px solid var(--panel-edge) !important;
+    background: transparent !important;
+    color: var(--ink-dim) !important;
+    transition: all 0.2s;
+  }
+  .tab-btn:hover {
+    color: var(--ink) !important;
+    background: rgba(255,255,255,0.02) !important;
+  }
+  .tab-btn.active {
+    background: var(--ember) !important;
+    color: #fff !important;
+    border-color: var(--ember) !important;
+  }
+  #camPanel{
+    position:fixed;top:16px;right:16px;z-index:10;width:176px;
+    background:linear-gradient(180deg,#241d17 0%,#1a140f 100%);
+    border:1px solid var(--panel-edge);border-radius:12px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04);
+    padding:12px 12px 13px;backdrop-filter:blur(4px);
+  }
+  #camPanel .cam-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--ink-dim);margin-bottom:9px}
+  .cam-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .pan-btn{
+    border:1px solid var(--panel-edge);background:#15100c;color:var(--ink-dim);
+    border-radius:6px;padding:8px 0;font-size:13px;cursor:pointer;font-family:inherit;
+    line-height:1;transition:background .15s,color .15s,border-color .15s;
+  }
+  .pan-btn:hover{color:var(--ink);background:rgba(255,255,255,.05)}
+  .pan-btn:active{background:var(--ember);color:#fff;border-color:var(--ember)}
+  .pan-btn.empty{visibility:hidden;pointer-events:none}
+  .window-panel {
+    position:fixed;width:320px;z-index:20;
+    background:linear-gradient(180deg,#241d17 0%,#1a140f 100%);
+    border:1px solid var(--ember);border-radius:12px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.04);
+    padding:16px;backdrop-filter:blur(4px);display:none;
+    color:var(--ink);font-family:inherit;
+  }
+  #inventoryPanel { top: 80px; right: 16px; }
+  #sensorPanel_1 { top: 80px; left: 340px; }
+  #sensorPanel_2 { top: 460px; left: 340px; }
+
+  .window-panel h3 {
+    margin:0 0 12px;font-size:12px;letter-spacing:.02em;font-weight:700;
+    color:var(--ember);border-bottom:1px dashed var(--panel-edge);padding-bottom:8px;
+    padding-right:24px;position:relative;
+  }
+  .window-panel .close-btn {
+    position:absolute;top:0px;right:0px;cursor:pointer;
+    color:var(--ink-dim);font-weight:800;font-size:16px;line-height:1;
+    transition:color .15s, transform .15s;padding:4px;
+  }
+  .window-panel .close-btn:hover {
+    color:#fff;transform:scale(1.2);
+  }
+  .window-panel .data-row {
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:11px;margin-bottom:8px;color:var(--ink-dim);
+  }
+  .window-panel .data-val {
+    color:#fff;font-variant-numeric:tabular-nums;font-weight:700;
+  }
+  .mold-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 12px;
+    border-top: 1px dashed var(--panel-edge);
+    padding-top: 12px;
+  }
+  .mold-cell {
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--panel-edge);
+    border-radius: 6px;
+    padding: 6px 2px;
+    text-align: center;
+  }
+  .mold-cell-num {
+    color: var(--ink-dim);
+    display: block;
+    font-size: 9px;
+    font-weight: bold;
+    margin-bottom: 2px;
+  }
+  .mold-cell-temp {
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+  }
+  .history-container {
+    margin-top: 6px;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5px;
+    text-align: center;
+  }
+  .history-table th {
+    color: var(--ink-dim);
+    border-bottom: 1px solid var(--panel-edge);
+    padding: 4px;
+    font-weight: normal;
+    font-size: 8.5px;
+  }
+  .history-table td {
+    padding: 4px 2px;
+    color: #fff;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  .history-table tr.latest { background: rgba(255,138,60,0.15); }
+  @media (max-width:560px){#camPanel{top:auto;bottom:10px;right:10px;left:10px;width:auto}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="sensorPanel_1" class="window-panel">
+  <h3><span id="sensorPanelTitle_1">SENSOR #1 (붕어빵)</span> <span class="close-btn" id="closeSensorPanel_1">&times;</span></h3>
+  <div class="data-row">센서 상태 <span class="data-val" style="color: #44ff44;">ACTIVE</span></div>
+  <div class="data-row">측정 대상 <span class="data-val" id="sensorTargetMold_1">—</span></div>
+  <div class="data-row">측정 온도 <span class="data-val" id="sensorRealtimeTemp_1">—</span></div>
+  <div class="mold-grid" id="sensorMoldGrid_1"></div>
+  <p style="margin: 8px 0 0; font-size: 10px; color: var(--ink-dim); text-align: center;">실시간 비접촉 레이저 모니터링</p>
+</div>
+
+<div id="sensorPanel_2" class="window-panel">
+  <h3><span id="sensorPanelTitle_2">SENSOR #2 (국화빵)</span> <span class="close-btn" id="closeSensorPanel_2">&times;</span></h3>
+  <div class="data-row">센서 상태 <span class="data-val" style="color: #44ff44;">ACTIVE</span></div>
+  <div class="data-row">측정 대상 <span class="data-val" id="sensorTargetMold_2">—</span></div>
+  <div class="data-row">측정 온도 <span class="data-val" id="sensorRealtimeTemp_2">—</span></div>
+  <div class="mold-grid" id="sensorMoldGrid_2"></div>
+  <p style="margin: 8px 0 0; font-size: 10px; color: var(--ink-dim); text-align: center;">실시간 비접촉 레이저 모니터링</p>
+</div>
+
+<div id="inventoryPanel" class="window-panel">
+  <h3><span>PRODUCTION QA REPORT</span> <span class="close-btn" id="closeInventoryPanel">&times;</span></h3>
+  <div class="data-row">붕어빵 생산량 <span class="data-val" id="qaBungServed" style="color: #ff8a3c; font-family: monospace;">0 개</span></div>
+  <div class="data-row">국화빵 생산량 <span class="data-val" id="qaGukServed" style="color: #ffea70; font-family: monospace;">0 개</span></div>
+  <div class="data-row">실시간 생산 속도 <span class="data-val" id="qaWpm" style="color: #00ffcc; font-family: monospace;">0 개/분 (WPM)</span></div>
+  <div class="data-row">총 가동 시간 <span class="data-val" id="qaRuntime" style="color: #ffffff; font-family: monospace;">0분 0초</span></div>
+
+  <div class="divider" style="border-top: 1px dashed var(--panel-edge); margin: 10px 0;"></div>
+
+  <div class="data-row" style="margin-bottom: 4px; font-weight: bold; color: var(--ink);">불량 유형 상세 분석</div>
+  <div style="font-size: 10.5px; color: var(--ink-dim); padding-left: 2px;">
+    <div style="margin-bottom: 6px; display: flex; justify-content: space-between;">덜 익음: <span class="data-val" id="qaUndercooked" style="color: #44ff44;">0</span></div>
+    <div style="margin-bottom: 6px; display: flex; justify-content: space-between;">탄 것: <span class="data-val" id="qaBurnt" style="color: #ff4444;">0</span></div>
+    <div style="margin-bottom: 6px; display: flex; justify-content: space-between;">파손 (낙하): <span class="data-val" id="qaCrushed" style="color: #ffaa00;">0</span></div>
+  </div>
+
+  <div class="divider" style="border-top: 1px dashed var(--panel-edge); margin: 10px 0;"></div>
+
+  <div class="data-row">종합 불량률 <span class="data-val" id="qaDefectRate" style="color: #ffea70;">0.0%</span></div>
+  
+  <div class="divider" style="border-top: 1px dashed var(--panel-edge); margin: 10px 0;"></div>
+  
+  <div class="data-row" style="margin-bottom: 4px; font-weight: bold; color: var(--ink);">주기별 생산 이력 (컨베이어 1회전 기준)</div>
+  <div class="history-container">
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>회차</th>
+          <th>생산</th>
+          <th>정상</th>
+          <th>불량</th>
+          <th>불량률</th>
+        </tr>
+      </thead>
+      <tbody id="qaHistoryBody">
+        <!-- Time-series rows render here -->
+      </tbody>
+    </table>
+  </div>
+  <p style="margin: 8px 0 0; font-size: 9px; color: var(--ink-dim); text-align: center;">실시간 포장 및 불량 검수 분석 중</p>
+</div>
+
+<div id="camPanel">
+  <div class="cam-title">Camera Move</div>
+  <div class="cam-pad">
+    <button class="pan-btn empty" tabindex="-1"></button>
+    <button class="pan-btn" data-pan="up" title="카메라 앞으로 이동">▲</button>
+    <button class="pan-btn empty" tabindex="-1"></button>
+    <button class="pan-btn" data-pan="left" title="카메라 왼쪽으로 이동">◀</button>
+    <button class="pan-btn" data-pan="home" title="기본 위치로">⌂</button>
+    <button class="pan-btn" data-pan="right" title="카메라 오른쪽으로 이동">▶</button>
+    <button class="pan-btn empty" tabindex="-1"></button>
+    <button class="pan-btn" data-pan="down" title="카메라 뒤로 이동">▼</button>
+    <button class="pan-btn empty" tabindex="-1"></button>
+  </div>
+</div>
+
+<div id="panel">
+  <h1><span class="kr">붕어빵</span> Oven Line</h1>
+  <p class="sub">2 lines · 20 units each · 3 fish each</p>
+
+  <div class="control-group">
+    <button id="btnPause" class="play-btn paused">▶ Play</button>
+    <div class="field inline">
+      <label for="simSpeed">Sim Speed <b><span id="simSpeedVal">1.0</span>x</b></label>
+      <input type="range" id="simSpeed" min="0.1" max="5.0" value="1.0" step="0.1" />
+    </div>
+  </div>
+
+  <div class="global-settings" style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--panel-edge);">
+    <div class="field">
+      <label for="roomTemp">Factory Temp <b><span id="roomTempVal">22</span>°C</b></label>
+      <input type="range" id="roomTemp" min="10" max="40" value="22" step="1" />
+    </div>
+    <div class="field">
+      <label for="roomHumidity">Factory Humidity <b><span id="roomHumidityVal">50</span>%</b></label>
+      <input type="range" id="roomHumidity" min="10" max="90" value="50" step="1" />
+    </div>
+    <div class="field">
+      <label for="beltSpeed">Belt Speed <b><span id="beltSpeedVal">1.4</span> u/s</b></label>
+      <input type="range" id="beltSpeed" min="0.3" max="5.0" value="1.4" step="0.1" />
+    </div>
+  </div>
+
+  <div class="tab-buttons" style="display: flex; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--panel-edge); padding-bottom: 6px;">
+    <button id="tabBtnLine1" class="tab-btn active" style="flex: 1; padding: 6px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold;">Line 1 (붕어빵)</button>
+    <button id="tabBtnLine2" class="tab-btn" style="flex: 1; padding: 6px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: bold;">Line 2 (국화빵)</button>
+  </div>
+
+  <div id="tabContentLine1" class="tab-content">
+    <div class="field">
+      <label for="fireTemp1">Fire Temp 1 <b><span id="fireTempVal1">220</span>°C</b></label>
+      <input type="range" id="fireTemp1" min="150" max="300" value="220" step="5" />
+    </div>
+    <div class="field">
+      <label for="lineSpeed1">Line Speed 1 <b><span id="lineSpeedVal1">1.0</span>x</b></label>
+      <input type="range" id="lineSpeed1" min="0.5" max="2.0" value="1.0" step="0.1" />
+    </div>
+    <div class="readout" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--panel-edge);">
+      Track speed <span id="speedOut1">—</span>
+    </div>
+  </div>
+
+  <div id="tabContentLine2" class="tab-content" style="display: none;">
+    <div class="field">
+      <label for="fireTemp2">Fire Temp 2 <b><span id="fireTempVal2">220</span>°C</b></label>
+      <input type="range" id="fireTemp2" min="150" max="300" value="220" step="5" />
+    </div>
+    <div class="field">
+      <label for="lineSpeed2">Line Speed 2 <b><span id="lineSpeedVal2">1.0</span>x</b></label>
+      <input type="range" id="lineSpeed2" min="0.5" max="2.0" value="1.0" step="0.1" />
+    </div>
+    <div class="readout" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--panel-edge);">
+      Track speed <span id="speedOut2">—</span>
+    </div>
+  </div>
+
+  <div class="readout" style="margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--panel-edge);">
+    Served <span id="servedOut" class="hot">0</span><br/>
+    덜 익음 <span id="undercookedOut" class="cold">0</span><br/>
+    탄 것 <span id="burntOut" class="warn">0</span><br/>
+    찌그러짐 <span id="crushedOut" class="warn">0</span><br/>
+    불량률 <span id="defectRateOut" class="defect">—</span>
+    <hr class="divider"/>
+    재고 적재 <span id="invOut" class="hot">0</span>
+    <div style="font-size: 11px; margin-left: 12px; color: var(--ink-dim); margin-top: 3px; font-weight: normal; line-height: 1.5;">
+      ├ 붕어빵: <span id="invBungOut" style="float: none !important; color: #ff8a3c; font-weight: bold;">0</span>개<br/>
+      └ 국화빵: <span id="invGukOut" style="float: none !important; color: #ffea70; font-weight: bold;">0</span>개
+    </div>
+    <hr class="divider"/>
+    반죽 (붕어빵) <span id="batterQtyOut1" class="cold">100%</span><br/>
+    팥 (붕어빵) <span id="beanQtyOut1" class="cold">100%</span><br/>
+    <hr class="divider" style="border-top: 1px dashed #2e2620; margin: 3px 0;"/>
+    반죽 (국화빵) <span id="batterQtyOut2" class="cold">100%</span><br/>
+    팥 (국화빵) <span id="beanQtyOut2" class="cold">100%</span>
+  </div>
+  <p class="hint">Drag to orbit · scroll to zoom · 우측 카메라 이동 버튼으로 다른 라인 보기. 반죽→팥→뚜껑→뒤집기→배출.</p>
+</div>
+
+
+
+<script src="three.min.js"></script>
+<script src="OrbitControls.js"></script>
+<script>
+/* ============================================================================
+   붕어빵 / Taiyaki single-line oven simulation  (v2)
+   ========================================================================== */
+(function () {
+"use strict";
+
+// ---------------------------------------------------------------- constants
+const LINE_X      = [-12.0, 0.0];
+const A = 1.5, B = 12.0;
+const TRACK_BELT_HALF_WIDTH = 0.45;
+const N_UNITS     = 20;
+const N_FISH      = 3;
+const FISH_SPREAD = 0.72;
+const TRAY_HALF_SPAN = (N_FISH - 1) * FISH_SPREAD / 2;
+const TRACK_Y     = 3.0;
+const BELT_TOP    = 0.22;
+const BELT_Z      = -13.2;
+const BELT_WIDTH  = (TRAY_HALF_SPAN * 2 + 1.0) * 2.0;
+const GROUND_Y    = -0.6;
+const GRAVITY     = 13.0;
+// ============================================================================
+// DIGITAL TWIN / IOT SENSOR DATA LAYER (실시간 센서 매핑용 전역 변수군)
+// ============================================================================
+let   ROOM_TEMP       = 22.0;  // Factory Temp (°C) [Default: 22]
+let   ROOM_HUMIDITY   = 50.0;  // Factory Humidity (%) [Default: 50]
+let   BELT_SPEED      = 1.4;   // Belt Speed (u/s) [Default: 1.4]
+let   BELT_GAP        = 0.40;  // Belt Spacing Gap (u) [Default: 0.40]
+
+// Ingredient Supply Levels (IoT) - Moved to line-specific properties
+
+// Production MES Counter Stats
+let   served          = 0;     // Total Waffles Served
+let   burnt           = 0;     // Burnt Defect Waffles
+let   undercooked     = 0;     // Undercooked Defect Waffles
+let   crushed         = 0;     // Crushed/Overlapped Defect Waffles
+let   totalDefects    = 0;     // Total unique defect waffles (prevents double counting)
+let   inventoryCount  = 0;     // Stock Stacked in Box (Total stacked)
+let   inventoryBungPlaced = 0; // Visual count of Bungeoppang
+let   inventoryGukPlaced = 0;  // Visual count of Gukhwabang
+let   inventoryBungCount = 0;   // Stock Stacked in Box (Bungeoppang)
+let   inventoryGukCount  = 0;   // Stock Stacked in Box (Gukhwabang)
+// ============================================================================
+const FISH_LENGTH = 1.25 * 0.66;
+
+const INV_CATCH_X = -22.5;
+const INV_COLS = 5, INV_ROWS = 4, INV_LAYERS = 3;
+const INV_DX = 0.55, INV_DZ = 0.55, INV_DY = 0.20;
+const INV_ORIGIN_X = -23.4;
+const INV_ORIGIN_Z = -B;
+const INV_BASE_Y  = GROUND_Y + 0.35;
+const INV_CAPACITY = INV_COLS * INV_ROWS * INV_LAYERS;
+
+const LID_OPEN    = -1.45;
+const LID_CLOSED  = 0.0;
+
+const ROTATE_DIR = -1;
+
+const U_BATTER    = (B - 4.8) / (4 * A + 4 * B);
+const U_BEAN      = (B + 0.24) / (4 * A + 4 * B);
+const FLIP_U      = (2 * B + A + 2.4) / (4 * A + 4 * B);
+const DISCHARGE_U = (4 * B + 3 * A - 1.5) / (4 * A + 4 * B);
+
+function getTrackPoint(u, lineB = B) {
+  const TRACK_PERIMETER = 4 * A + 4 * lineB;
+  let d = (u * TRACK_PERIMETER + 1.5) % TRACK_PERIMETER;
+  if (d < 0) d += TRACK_PERIMETER;
+  
+  let x = 0, z = 0, rotY = 0;
+  if (d < 2 * lineB) {
+    x = -A;
+    z = -lineB + d;
+    rotY = Math.PI / 2;
+  } else if (d < 2 * lineB + 2 * A) {
+    x = -A + (d - 2 * lineB);
+    z = lineB;
+    rotY = Math.PI;
+  } else if (d < 4 * lineB + 2 * A) {
+    x = A;
+    z = lineB - (d - 2 * lineB - 2 * A);
+    rotY = -Math.PI / 2;
+  } else {
+    x = A - (d - 4 * lineB - 2 * A);
+    z = -lineB;
+    rotY = 0;
+  }
+  return { x, z, rotY };
+}
+
+const C_BATTER = new THREE.Color(0xf3e2b0);
+const C_GOLD   = new THREE.Color(0xb5701f);
+const C_DARKEN = new THREE.Color(0x7d4a16);
+
+// ---------------------------------------------------------------- renderer / scene
+const app = document.getElementById("app");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x282c34, 1);
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x282c34, 34, 80);
+
+const CAM_TARGET = new THREE.Vector3(-5, 2.2, -1);
+const CAM_OFFSET = new THREE.Vector3(-0.4, 11.2, -26.9);
+let VIEW_SIZE = 18;
+const aspect0 = window.innerWidth / window.innerHeight;
+const camera = new THREE.OrthographicCamera(
+  -VIEW_SIZE * aspect0, VIEW_SIZE * aspect0, VIEW_SIZE, -VIEW_SIZE, 0.1, 300
+);
+camera.position.copy(CAM_TARGET).add(CAM_OFFSET);
+camera.lookAt(CAM_TARGET);
+
+let controls = null;
+if (THREE.OrbitControls) {
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.copy(CAM_TARGET);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.minZoom = 0.5;
+  controls.maxZoom = 3.0;
+  controls.update();
+} else {
+  camera.lookAt(CAM_TARGET);
+}
+
+// ---------------------------------------------------------------- default camera view
+// Used by the ⌂ home button to snap back to the starting shot. Per-line preset shots were
+// removed in favor of free left/right panning (drag, or the ◀ ▶ buttons) so any number of
+// lines laid out along X can be scrolled to.
+const CAM_VIEWS = {
+  default: {
+    target: CAM_TARGET.clone(),
+    pos:    CAM_TARGET.clone().add(CAM_OFFSET),
+    zoom:   1.0
+  }
+};
+
+let camTransition = null;
+function transitionCamera(pos, target, zoom, duration) {
+  camTransition = {
+    t: 0,
+    duration,
+    fromPos: camera.position.clone(),
+    fromTarget: controls ? controls.target.clone() : CAM_TARGET.clone(),
+    fromZoom: camera.zoom,
+    toPos: pos.clone(),
+    toTarget: target.clone(),
+    toZoom: zoom
+  };
+}
+
+function setCameraView(name) {
+  const v = CAM_VIEWS[name];
+  if (!v) return;
+  transitionCamera(v.pos, v.target, v.zoom, 0.8);
+}
+
+// Translates the camera rig (position AND target together) across the ground plane,
+// rather than just orbiting the same fixed pivot point. Called every frame while a
+// pan button is held down (see activePanDir below), so movement is continuous.
+const PAN_HOLD_SPEED = 16; // units per second
+let activePanDir = null;
+function panCameraStep(dir, dt) {
+  const target = controls ? controls.target.clone() : CAM_TARGET.clone();
+  const forward = new THREE.Vector3().subVectors(target, camera.position);
+  forward.y = 0; forward.normalize();
+  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+  const delta = new THREE.Vector3();
+  if (dir === "up")    delta.copy(forward);
+  if (dir === "down")  delta.copy(forward).negate();
+  if (dir === "left")  delta.copy(right).negate();
+  if (dir === "right") delta.copy(right);
+  delta.multiplyScalar(PAN_HOLD_SPEED * dt);
+
+  camTransition = null; // a held pan overrides any in-flight snap transition
+  camera.position.add(delta);
+  if (controls) controls.target.add(delta);
+}
+
+function updateCameraTransition(rawDt) {
+  if (!camTransition) return;
+  camTransition.t += rawDt / camTransition.duration;
+  const t = Math.min(camTransition.t, 1);
+  const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // easeInOutQuad
+  camera.position.lerpVectors(camTransition.fromPos, camTransition.toPos, ease);
+  if (controls) controls.target.lerpVectors(camTransition.fromTarget, camTransition.toTarget, ease);
+  camera.zoom = camTransition.fromZoom + (camTransition.toZoom - camTransition.fromZoom) * ease;
+  camera.updateProjectionMatrix();
+  if (t >= 1) camTransition = null;
+}
+
+// ---------------------------------------------------------------- lights
+scene.add(new THREE.AmbientLight(0x6b5942, 0.55));
+const key = new THREE.DirectionalLight(0xffe6c0, 0.85); key.position.set(6, 14, 10); scene.add(key);
+const rim = new THREE.DirectionalLight(0x9fb4ff, 0.25); rim.position.set(-8, 6, -10); scene.add(rim);
+const burnerLights = LINE_X.map((x) => {
+  const l = new THREE.PointLight(0xff6a1e, 1.0, 12, 2.0);
+  l.position.set(x, TRACK_Y - 0.7, 0); scene.add(l); return l;
+});
+
+// ---------------------------------------------------------------- ground
+{
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(120, 80),
+    new THREE.MeshPhongMaterial({ color: 0x4a505e, shininess: 6 }));
+  g.rotation.x = -Math.PI / 2; g.position.y = GROUND_Y; scene.add(g);
+}
+
+// absolute axes helper removed
+
+
+
+
+
+// ---------------------------------------------------------------- shared geometry
+function makeFishGeometry() {
+  const s = new THREE.Shape();
+  s.moveTo( 0.90,  0.00);
+  s.quadraticCurveTo( 0.86,  0.34,  0.55,  0.42);
+  s.quadraticCurveTo( 0.34,  0.50,  0.12,  0.45);
+  s.quadraticCurveTo( 0.00,  0.64, -0.14,  0.46);
+  s.quadraticCurveTo(-0.40,  0.40, -0.60,  0.30);
+  s.lineTo(-0.96,  0.50);
+  s.quadraticCurveTo(-0.80,  0.18, -0.78,  0.00);
+  s.quadraticCurveTo(-0.80, -0.18, -0.96, -0.50);
+  s.lineTo(-0.60, -0.30);
+  s.quadraticCurveTo(-0.40, -0.40, -0.10, -0.45);
+  s.quadraticCurveTo( 0.34, -0.50,  0.55, -0.42);
+  s.quadraticCurveTo( 0.86, -0.34,  0.90,  0.00);
+  const geo = new THREE.ExtrudeGeometry(s, {
+    depth: 0.34, bevelEnabled: true, bevelThickness: 0.10,
+    bevelSize: 0.08, bevelSegments: 2, curveSegments: 6, steps: 1
+  });
+  geo.center();
+  geo.scale(0.66, 0.66, 0.66);
+  geo.rotateX(-Math.PI / 2);
+  geo.computeVertexNormals();
+  return geo;
+}
+const FISH_GEO = makeFishGeometry();
+
+const FLOWER_BASE_GEO = (function() {
+  const s = new THREE.Shape();
+  s.absarc(0, 0, 0.19, 0, Math.PI * 2);
+  const geo = new THREE.ExtrudeGeometry(s, {
+    depth: 0.10, bevelEnabled: true, bevelThickness: 0.025,
+    bevelSize: 0.025, bevelSegments: 3, curveSegments: 24, steps: 1
+  });
+  geo.center();
+  geo.rotateX(-Math.PI / 2);
+  geo.computeVertexNormals();
+  return geo;
+})();
+
+const FLOWER_PETAL_GEO = (function() {
+  const geo = new THREE.SphereGeometry(0.06, 12, 8);
+  geo.scale(1.8, 0.6, 0.7); // Elongated, flattened teardrop shape
+  return geo;
+})();
+
+const FLOWER_CORE_GEO = new THREE.SphereGeometry(0.05, 12, 12);
+
+function createFlowerWaffle(mat) {
+  const group = new THREE.Group();
+
+  // 1. Perfectly circular, smooth beveled base disc (total radius 0.215, height 0.15)
+  const body = new THREE.Mesh(FLOWER_BASE_GEO, mat);
+  group.add(body);
+
+  // 2. Embossed central core hubs (top and bottom)
+  const coreTop = new THREE.Mesh(FLOWER_CORE_GEO, mat);
+  coreTop.position.y = 0.05 + 0.01;
+  group.add(coreTop);
+
+  const coreBottom = new THREE.Mesh(FLOWER_CORE_GEO, mat);
+  coreBottom.position.y = -0.05 - 0.01;
+  group.add(coreBottom);
+
+  // 3. 12 embossed Chrysanthemum petals inside the circular boundary
+  const nPetals = 12;
+  for (let i = 0; i < nPetals; i++) {
+    const theta = (i / nPetals) * Math.PI * 2;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+
+    // Top petal
+    const pTop = new THREE.Mesh(FLOWER_PETAL_GEO, mat);
+    pTop.position.set(0.09 * cos, 0.05 + 0.01, 0.09 * sin);
+    pTop.rotation.y = -theta;
+    group.add(pTop);
+
+    // Bottom petal
+    const pBottom = new THREE.Mesh(FLOWER_PETAL_GEO, mat);
+    pBottom.position.set(0.09 * cos, -0.05 - 0.01, 0.09 * sin);
+    pBottom.rotation.y = -theta;
+    group.add(pBottom);
+  }
+
+  return group;
+}
+
+function createWaffleVisual(lineIndex, mat) {
+  if (lineIndex === 1) {
+    return createFlowerWaffle(mat);
+  } else {
+    return new THREE.Mesh(FISH_GEO, mat);
+  }
+}
+
+function makeBeanGeometry() {
+  const geo = new THREE.CylinderGeometry(0.08, 0.08, 0.08, 8, 1);
+  geo.scale(3.2, 1.0, 1.5);
+  geo.rotateX(-Math.PI / 2);
+  return geo;
+}
+const BEAN_GEO = makeBeanGeometry();
+const FLOWER_BEAN_GEO = (function() {
+  const geo = new THREE.CylinderGeometry(0.10, 0.10, 0.04, 12, 1);
+  geo.rotateX(-Math.PI / 2);
+  return geo;
+})();
+const BEAN_MAT_MOLD = new THREE.MeshPhongMaterial({
+  color: 0x4a1e12,
+  specular: 0x22110a,
+  shininess: 12
+});
+
+// Removed makeOvalPlate helper
+
+const GOLD_MAT = new THREE.MeshPhongMaterial({
+  color: 0xb06a1c, specular: 0x4a2c10, shininess: 24,
+  emissive: 0x2a1605, emissiveIntensity: 0.4
+});
+const BURNT_MAT = new THREE.MeshPhongMaterial({
+  color: 0x1c0c04, specular: 0x100804, shininess: 4,
+  emissive: 0x080402, emissiveIntensity: 0.15
+});
+const UNDERCOOKED_MAT = new THREE.MeshPhongMaterial({
+  color: 0xf0dea0, specular: 0x332a18, shininess: 10,
+  emissive: 0x060500
+});
+
+function makeRectangularRim(rx, rz, rx_in, rz_in, h) {
+  const shape = new THREE.Shape();
+  shape.moveTo(-rx, -rz);
+  shape.lineTo(-rx, rz);
+  shape.lineTo(rx, rz);
+  shape.lineTo(rx, -rz);
+  shape.closePath();
+
+  const hole = new THREE.Path();
+  hole.moveTo(-rx_in, -rz_in);
+  hole.lineTo(rx_in, -rz_in);
+  hole.lineTo(rx_in, rz_in);
+  hole.lineTo(-rx_in, rz_in);
+  hole.closePath();
+  shape.holes.push(hole);
+
+  const g = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 2 });
+  g.rotateX(-Math.PI / 2);
+  return g;
+}
+
+const PLATE_GEO = new THREE.BoxGeometry(1.9, 0.22, (TRAY_HALF_SPAN + 0.67) * 2);
+const RIM_GEO   = makeRectangularRim(1.02, TRAY_HALF_SPAN + 0.75, 0.96, TRAY_HALF_SPAN + 0.69, 0.10);
+const LID_GEO   = new THREE.BoxGeometry(1.76, 0.16, (TRAY_HALF_SPAN + 0.59) * 2);
+const PLATE_MAT = new THREE.MeshPhongMaterial({ color: 0x2c2832, specular: 0x9a9aa6, shininess: 70 });
+const RIM_MAT   = new THREE.MeshPhongMaterial({ color: 0x1c1920, specular: 0x666672, shininess: 50 });
+const LID_MAT   = new THREE.MeshPhongMaterial({ color: 0x35313c, specular: 0xb0b0bc, shininess: 80 });
+
+// ---------------------------------------------------------------- one mold unit
+function buildUnit(parent, lineIndex) {
+  const root = new THREE.Group();
+  const flip = new THREE.Group();
+  root.add(flip); parent.add(root);
+
+  flip.add(new THREE.Mesh(PLATE_GEO, PLATE_MAT));
+  const rimMesh = new THREE.Mesh(RIM_GEO, RIM_MAT); rimMesh.position.y = 0.06; flip.add(rimMesh);
+
+  const fishMeshes = [], fishMats = [];
+  const beanMeshes = [];
+  const zs = [];
+  for (let zi = 0; zi < N_FISH; zi++) zs.push((zi - (N_FISH - 1) / 2) * FISH_SPREAD);
+  for (let k = 0; k < N_FISH; k++) {
+    const m = new THREE.MeshPhongMaterial({
+      color: C_BATTER.clone(), specular: 0x332a18, shininess: 18, emissive: 0x000000
+    });
+    const fish = createWaffleVisual(lineIndex, m);
+    fish.position.set(0, 0.17, zs[k]);
+    fish.visible = false;
+    flip.add(fish); fishMeshes.push(fish); fishMats.push(m);
+
+    const beanBlobGeo = lineIndex === 1 ? FLOWER_BEAN_GEO : BEAN_GEO;
+    const beanBlob = new THREE.Mesh(beanBlobGeo, BEAN_MAT_MOLD);
+    beanBlob.position.set(0, lineIndex === 1 ? 0.20 : 0.28, zs[k]);
+    beanBlob.visible = false;
+    flip.add(beanBlob);
+    beanMeshes.push(beanBlob);
+  }
+
+  const lidPivot = new THREE.Group();
+  lidPivot.position.set(0.9, 0.30, 0);
+  const lid = new THREE.Mesh(LID_GEO, LID_MAT);
+  lid.position.set(-0.9, 0, 0);
+  lidPivot.add(lid);
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.03, 6, 10),
+    new THREE.MeshPhongMaterial({ color: 0x141318 }));
+  handle.rotation.x = Math.PI / 2; handle.position.set(-1.55, 0.12, 0); lidPivot.add(handle);
+  lidPivot.rotation.z = LID_OPEN;
+  flip.add(lidPivot);
+
+  return {
+    root, flip, lidPivot, fishMeshes, fishMats, beanMeshes,
+    lineIndex,
+    theta: 0, u: 0, prevU: 0,
+    filled: false,
+    batterFilled: false, batterAnim: 1,
+    beanFilled: false, beanAnim: 1,
+    flipDone: false, flipActive: false, flipT: 0,
+    lidAngle: LID_OPEN, lidTarget: LID_OPEN,
+    cookProgress: 0.0,
+    moldTemp: 180.0,
+    batterWaiting: false,
+  };
+}
+
+// ---------------------------------------------------------------- per-line furniture
+function buildLineFurniture(group, lineX, lineB) {
+  const ringShape = new THREE.Shape();
+  const ax_out = A + TRACK_BELT_HALF_WIDTH, bz_out = lineB + TRACK_BELT_HALF_WIDTH;
+  ringShape.moveTo(-ax_out, -bz_out);
+  ringShape.lineTo(-ax_out, bz_out);
+  ringShape.lineTo(ax_out, bz_out);
+  ringShape.lineTo(ax_out, -bz_out);
+  ringShape.closePath();
+
+  const hole = new THREE.Path();
+  const ax_in = A - TRACK_BELT_HALF_WIDTH, bz_in = lineB - TRACK_BELT_HALF_WIDTH;
+  hole.moveTo(-ax_in, -bz_in);
+  hole.lineTo(ax_in, -bz_in);
+  hole.lineTo(ax_in, bz_in);
+  hole.lineTo(-ax_in, bz_in);
+  hole.closePath();
+  ringShape.holes.push(hole);
+
+  const ringGeo = new THREE.ExtrudeGeometry(ringShape, { depth: 0.5, bevelEnabled: false, curveSegments: 2, steps: 1 });
+  ringGeo.rotateX(-Math.PI / 2);
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshPhongMaterial({ color: 0x161310, specular: 0x55503f, shininess: 30 }));
+  ring.position.set(lineX, TRACK_Y - 0.55, 0); group.add(ring);
+
+  const burners = []; const NB = 40;
+  const burnerY = TRACK_Y - 0.95;
+  const pipeY = burnerY - 0.25;
+
+  const darkMetalMat = new THREE.MeshPhongMaterial({ color: 0x222222, specular: 0x555555, shininess: 30 });
+  const copperNozzleMat = new THREE.MeshPhongMaterial({ color: 0x8b5a2b, specular: 0x6a401a, shininess: 50 });
+  const sheetMetalMat = new THREE.MeshPhongMaterial({ color: 0x2f2f2f, specular: 0x444444, shininess: 20, side: THREE.DoubleSide });
+
+  for (let i = 0; i < NB; i++) {
+    const u1 = i / NB;
+    const u2 = (i + 1) / NB;
+
+    const pt1 = getTrackPoint(u1, lineB);
+    const pt2 = getTrackPoint(u2, lineB);
+
+    const x1 = lineX + pt1.x, z1 = pt1.z;
+    const x2 = lineX + pt2.x, z2 = pt2.z;
+
+    const p1 = new THREE.Vector3(x1, pipeY, z1);
+    const p2 = new THREE.Vector3(x2, pipeY, z2);
+    const dist = p1.distanceTo(p2);
+    
+    // Gas pipe segment connecting burner i to i+1
+    const pipeSeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, dist, 6), darkMetalMat);
+    pipeSeg.position.copy(p1).add(p2).multiplyScalar(0.5);
+    pipeSeg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p2.clone().sub(p1).normalize());
+    group.add(pipeSeg);
+
+    // Vertical nozzle holder connecting pipe to burner
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 6), copperNozzleMat);
+    nozzle.position.set(x1, pipeY + 0.1, z1);
+    group.add(nozzle);
+
+    // Flame (Cone)
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 7), new THREE.MeshBasicMaterial({ color: 0xff7a22 }));
+    cone.position.set(x1, burnerY, z1);
+    group.add(cone); burners.push(cone);
+
+    // Build inner/outer steel enclosure wall segments
+    const buildWallSegment = (offset) => {
+      const segVec = p2.clone().sub(p1);
+      segVec.y = 0;
+      segVec.normalize();
+      
+      const mid = p1.clone().add(p2).multiplyScalar(0.5);
+      const outward = new THREE.Vector3(mid.x - lineX, 0, mid.z).normalize();
+      
+      const pt1 = p1.clone().add(outward.clone().multiplyScalar(offset));
+      const pt2 = p2.clone().add(outward.clone().multiplyScalar(offset));
+      pt1.y = burnerY - 0.1;
+      pt2.y = burnerY - 0.1;
+      
+      const wDist = pt1.distanceTo(pt2);
+      const plate = new THREE.Mesh(new THREE.PlaneGeometry(wDist, 0.8), sheetMetalMat);
+      plate.position.copy(pt1).add(pt2).multiplyScalar(0.5);
+      plate.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), pt2.clone().sub(pt1).normalize());
+      group.add(plate);
+    };
+
+    buildWallSegment(-0.4);
+    buildWallSegment(0.4);
+  }
+
+  const uBatter = (lineB - 4.8) / (4 * A + 4 * lineB);
+  const uBean = (lineB + 0.24) / (4 * A + 4 * lineB);
+
+  const pt_bat = getTrackPoint(uBatter, lineB);
+  const bx = lineX + pt_bat.x;
+  const bz = pt_bat.z;
+  const rotY_bat = pt_bat.rotY;
+  const batDisp = buildDispenserSystem(group, bx, bz, rotY_bat, 'batter');
+
+  const pt_bean = getTrackPoint(uBean, lineB);
+  const px = lineX + pt_bean.x;
+  const pz = pt_bean.z;
+  const rotY_bean = pt_bean.rotY;
+  const beanDisp = buildDispenserSystem(group, px, pz, rotY_bean, 'bean');
+
+  return {
+    burners,
+    batterNozzleTipY: batDisp.nozzleTipY,
+    batterSlots: batDisp.slots,
+    beanNozzleTipY: beanDisp.nozzleTipY,
+    beanSlots: beanDisp.slots,
+    batDisp,
+    beanDisp
+  };
+}
+
+// ---------------------------------------------------------------- six-hole dispenser
+function makeHose(from, to, sag, radius, mat) {
+  const mid = from.clone().lerp(to, 0.5);
+  mid.y += sag;
+  const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
+  return new THREE.Mesh(new THREE.TubeGeometry(curve, 14, radius, 6, false), mat);
+}
+function makeLabelSprite(text, bg) {
+  const cv = document.createElement("canvas"); cv.width = 360; cv.height = 100;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, 360, 100);
+  ctx.strokeStyle = "#161310"; ctx.lineWidth = 5; ctx.strokeRect(3, 3, 354, 94);
+  ctx.fillStyle = "#f6ead4"; ctx.font = "700 40px Helvetica, Arial, sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(text, 180, 51);
+  const tex = new THREE.CanvasTexture(cv);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex }));
+  sprite.scale.set(2.9, 0.81, 1);
+  return sprite;
+}
+function buildTempSensor(parentGroup, lineX, lineB, lineIndex) {
+  const sensorGroup = new THREE.Group();
+  
+  const targetX = lineX - A; // Target X is where molds pass (lineX - 1.5)
+  const columnX = lineX - 4.0; // Place column at lineX - 4.0 as requested
+  const targetZ = -8.0;
+  const sensorY = TRACK_Y + 1.6; // Y = 4.6
+
+  // 1. Heavy Base Plate at ground floor for stability
+  const basePlate = new THREE.Mesh(
+    new THREE.BoxGeometry(0.5, 0.08, 0.5),
+    new THREE.MeshPhongMaterial({ color: 0x1b1c1d, specular: 0x333333, shininess: 10 })
+  );
+  basePlate.position.set(columnX, GROUND_Y + 0.04, targetZ);
+  sensorGroup.add(basePlate);
+
+  // 2. Thick Bracket Column (heavy industrial metal pillar)
+  const bracketColumn = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.18, sensorY - GROUND_Y, 12),
+    new THREE.MeshPhongMaterial({ color: 0x8a8f97, specular: 0xffffff, shininess: 60 }) // Steel Gray matched to hopper legs
+  );
+  bracketColumn.position.set(columnX, (GROUND_Y + sensorY) / 2, targetZ);
+  sensorGroup.add(bracketColumn);
+
+  // 3. Thick Bracket Arm (horizontal beam extending from columnX to columnX + armLen)
+  const armLen = 0.6; // Further shortened to 0.6 units to make it super compact!
+  const bracketArm = new THREE.Mesh(
+    new THREE.BoxGeometry(armLen, 0.12, 0.12),
+    new THREE.MeshPhongMaterial({ color: 0x8a8f97, specular: 0xffffff, shininess: 60 }) // Steel Gray matched to hopper legs
+  );
+  bracketArm.position.set(columnX + armLen/2, sensorY, targetZ);
+  sensorGroup.add(bracketArm);
+
+  // 4. Model 4-IRMAN: Digital Display Box Console mounted on the Column
+  const dispBoxG = new THREE.Group();
+  // Mount it directly on the front face (Z-axis negative) of the column pillar
+  dispBoxG.position.set(columnX, TRACK_Y + 1.0, targetZ - 0.26);
+  // Align to face the Z-axis negative direction
+  dispBoxG.rotation.y = Math.PI;
+
+  // 4a. Gray metal console back-enclosure
+  const boxBack = new THREE.Mesh(
+    new THREE.BoxGeometry(0.66, 0.44, 0.16),
+    new THREE.MeshPhongMaterial({ color: 0x3e3f42, specular: 0x999999, shininess: 40 })
+  );
+  dispBoxG.add(boxBack);
+
+  // 4b. Front face panel CanvasTexture for branding & dynamic LED temp
+  const cv = document.createElement("canvas");
+  cv.width = 128;
+  cv.height = 96;
+  const ctx = cv.getContext("2d");
+  const tex = new THREE.CanvasTexture(cv);
+
+  const facePanel = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.62, 0.40),
+    new THREE.MeshBasicMaterial({ map: tex })
+  );
+  facePanel.position.set(0, 0, 0.081); // sit flat on the front face of box
+  dispBoxG.add(facePanel);
+  sensorGroup.add(dispBoxG);
+
+  // 5. Model IR-22: Screw-threaded cylindrical sensor head (placed at columnX + armLen)
+  const sensorX = columnX + armLen;
+  const headGroup = new THREE.Group();
+  headGroup.position.set(sensorX, sensorY, targetZ);
+  
+  // Angle it exactly -30 degrees visually (pointing diagonally left towards the pillar)
+  const theta = 30 * Math.PI / 180; // 30 degrees
+  headGroup.rotation.z = theta; // rotate -30 degrees visually
+  
+  sensorGroup.add(headGroup);
+
+  // 5a. Top joint mount box
+  const joint = new THREE.Mesh(
+    new THREE.BoxGeometry(0.2, 0.20, 0.2),
+    new THREE.MeshPhongMaterial({ color: 0x141517, specular: 0x666666, shininess: 30 })
+  );
+  joint.position.set(0, 0, 0);
+  headGroup.add(joint);
+
+  // 5b. IR-22 Smooth steel rear housing barrel
+  const housing = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.09, 0.32, 12),
+    new THREE.MeshPhongMaterial({ color: 0xeeeeee, specular: 0xffffff, shininess: 120 }) // Shiny Silver Chrome
+  );
+  housing.position.set(0, -0.22, 0);
+  housing.userData = { isSensor: true, lineIndex: lineIndex }; // clickable identifier
+  headGroup.add(housing);
+
+  // 5c. Hexagonal clamping nuts (stacked Hex cylinders)
+  const nutMat = new THREE.MeshPhongMaterial({ color: 0xbfb394, specular: 0xffffff, shininess: 100 });
+  const nut1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.03, 6), nutMat);
+  nut1.position.set(0, -0.37, 0);
+  nut1.rotation.y = Math.PI / 6;
+  headGroup.add(nut1);
+
+  const nut2 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.03, 6), nutMat);
+  nut2.position.set(0, -0.40, 0);
+  headGroup.add(nut2);
+
+  // 5d. IR-22 Front screw-threaded barrel
+  const threadBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.075, 0.075, 0.26, 12),
+    new THREE.MeshPhongMaterial({ color: 0xcccccc, specular: 0x999999, shininess: 90 })
+  );
+  threadBody.position.set(0, -0.54, 0);
+  headGroup.add(threadBody);
+
+  // 5e. Build threaded grooves (stacking thin metal rings)
+  const ringMat = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, specular: 0x666666, shininess: 50 });
+  for (let r = 0; r < 7; r++) {
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.081, 0.081, 0.015, 10), ringMat);
+    ring.position.set(0, -0.44 - r * 0.034, 0);
+    headGroup.add(ring);
+  }
+
+  // 5f. End lens aperture (black ring face)
+  const lens = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.05, 0.01, 8),
+    new THREE.MeshBasicMaterial({ color: 0x050505 })
+  );
+  lens.position.set(0, -0.67, 0);
+  headGroup.add(lens);
+
+  // 6. Sensor Connection Cable (flowing from IR-22 head tail to 4-IRMAN gland)
+  const p1 = new THREE.Vector3(sensorX, sensorY - 0.06, targetZ);
+  const p2 = new THREE.Vector3(columnX + 0.28, TRACK_Y + 1.0, targetZ + 0.12);
+  const cableCurve = new THREE.QuadraticBezierCurve3(
+    p1,
+    new THREE.Vector3((p1.x + p2.x)/2, sensorY + 0.35, (p1.z + p2.z)/2 - 0.25),
+    p2
+  );
+  const cable = new THREE.Mesh(
+    new THREE.TubeGeometry(cableCurve, 10, 0.024, 6, false), // thin black cable
+    new THREE.MeshPhongMaterial({ color: 0x0f1011, shininess: 10 })
+  );
+  sensorGroup.add(cable);
+
+  // 7. Laser Beam (diagonal laser pointing from sensor tip to the belt height)
+  const beamTheta = 30 * Math.PI / 180;
+  const dy = (sensorY - 0.67) - (TRACK_Y + 0.18); // 0.75 units
+  const beamLength = dy / Math.cos(beamTheta); // ~0.866 units
+  const beamGeo = new THREE.CylinderGeometry(0.01, 0.01, beamLength, 6);
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xff1111,
+    transparent: true,
+    opacity: 0.55
+  });
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  // Place extending diagonally along the local Y axis
+  beam.position.set(0, -0.67 - beamLength / 2, 0);
+  headGroup.add(beam);
+
+  // 8. Laser pointer spot (glowing red sphere, at the end of the diagonal beam inside headGroup)
+  const spot = new THREE.Mesh(
+    new THREE.SphereGeometry(0.03, 8, 8),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 })
+  );
+  spot.position.set(0, -0.67 - beamLength, 0);
+  headGroup.add(spot);
+
+  sensorGroup.traverse(child => {
+    if (child.isMesh && child !== facePanel) {
+      // Map raycast properties to all metal structural elements
+      child.userData = { isSensor: true, lineIndex: lineIndex };
+    }
+  });
+
+  parentGroup.add(sensorGroup);
+  return {
+    sensorGroup,
+    dispCanvas: cv,
+    dispCtx: ctx,
+    dispTex: tex
+  };
+}
+
+function buildDispenserSystem(group, nx, nz, rotY, type) {
+  const dirVec = new THREE.Vector3(Math.sin(rotY), 0, Math.cos(rotY));
+  const perpVec = new THREE.Vector3(Math.cos(rotY), 0, -Math.sin(rotY));
+
+  const slots = [];
+  for (let k = 0; k < N_FISH; k++) {
+    const lane = k - (N_FISH - 1) / 2;
+    const z = lane * FISH_SPREAD;
+    slots.push({ x: nx + dirVec.x * z, z: nz + dirVec.z * z, lane });
+  }
+
+  const headY = TRACK_Y + 1.1, nozzleTipY = TRACK_Y + 0.5;
+
+  const chamberMat   = new THREE.MeshPhongMaterial({ color: 0xb9bec7, specular: 0xffffff, shininess: 90 });
+  const nozzleOutMat = new THREE.MeshPhongMaterial({ color: 0xd4c080, specular: 0xffffff, shininess: 100, transparent: true, opacity: 0.7 });
+
+  slots.forEach((s) => {
+    const chamber = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.08, 0.26, 8), chamberMat);
+    chamber.position.set(s.x, headY, s.z); group.add(chamber);
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.025, headY - nozzleTipY, 8), nozzleOutMat);
+    nozzle.position.set(s.x, (headY + nozzleTipY) / 2, s.z); group.add(nozzle);
+  });
+
+  const TANK_BODY_H = 3.0;
+  const hopBotY = TRACK_Y + 2.4;
+  const hopTopY = hopBotY + TANK_BODY_H;
+
+  const steelMat      = new THREE.MeshPhongMaterial({ color: 0xcfd4da, specular: 0xffffff, shininess: 110 });
+
+  function hopper(tankX, tankZ, contentMat, label, bg) {
+    const baseX = tankX, baseZ = tankZ;
+    const g = new THREE.Group(); g.position.set(baseX, 0, baseZ);
+
+    const TANK_R = 0.82;
+    const CYL_H  = TANK_BODY_H * 0.62;
+    const FUN_H  = TANK_BODY_H - CYL_H;
+    
+    // Outer shell (transparent glass)
+    const glassMat = new THREE.MeshPhongMaterial({
+      color: 0xffffff, transparent: true, opacity: 0.18, shininess: 120, specular: 0xffffff
+    });
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(TANK_R, TANK_R, CYL_H, 16), glassMat);
+    cyl.position.y = hopBotY + FUN_H + CYL_H / 2; g.add(cyl);
+
+    // Inner content cylinder
+    const contentMesh = new THREE.Mesh(new THREE.CylinderGeometry(TANK_R - 0.02, TANK_R - 0.02, CYL_H, 16), contentMat);
+    contentMesh.position.y = hopBotY + FUN_H + CYL_H / 2; g.add(contentMesh);
+
+    const funnel = new THREE.Mesh(new THREE.CylinderGeometry(TANK_R, 0.16, FUN_H, 16), steelMat);
+    funnel.position.y = hopBotY + FUN_H / 2; g.add(funnel);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(TANK_R, 0.05, 8, 20), steelMat);
+    rim.rotation.x = Math.PI / 2; rim.position.y = hopTopY; g.add(rim);
+    const band = new THREE.Mesh(new THREE.TorusGeometry(TANK_R + 0.01, 0.05, 8, 20), contentMat);
+    band.rotation.x = Math.PI / 2; band.position.y = hopBotY + FUN_H + CYL_H * 0.5; g.add(band);
+    
+    // Canvas sprite setup
+    const cv = document.createElement("canvas"); cv.width = 512; cv.height = 128;
+    const ctx = cv.getContext("2d");
+    const labelTex = new THREE.CanvasTexture(cv);
+    const label3d = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex, transparent: true }));
+    label3d.scale.set(6.0, 1.5, 1); // Larger scale for high-readability monitoring
+    label3d.position.set(-3, hopTopY + 0.60, 0); // Floating shifted by -3 in X
+    g.add(label3d);
+
+    const legH = hopBotY - GROUND_Y;
+    if (legH > 0.001) {
+      const legMat = new THREE.MeshPhongMaterial({ color: 0x8a8f97, specular: 0xffffff, shininess: 60 });
+      const legMidY = (GROUND_Y + hopBotY) / 2, legR = 0.68;
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, legH, 6), legMat);
+        leg.position.set(legR * Math.cos(a), legMidY, legR * Math.sin(a)); g.add(leg);
+        const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.05, 8), legMat);
+        foot.position.set(legR * Math.cos(a), GROUND_Y + 0.03, legR * Math.sin(a)); g.add(foot);
+      }
+      [hopBotY - 0.18, GROUND_Y + legH * 0.45].forEach((by) => {
+        const brace = new THREE.Mesh(new THREE.TorusGeometry(legR, 0.028, 6, 20), legMat);
+        brace.rotation.x = Math.PI / 2; brace.position.y = by; g.add(brace);
+      });
+    }
+    group.add(g);
+
+    const throatY = hopBotY - 0.04;
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.22, 8), steelMat);
+    neck.position.set(baseX, hopBotY + 0.08, baseZ); group.add(neck);
+    const stubH = 0.28;
+    const stub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.045, stubH, 8), contentMat);
+    stub.position.set(baseX, throatY - stubH / 2, baseZ); group.add(stub);
+    
+    return {
+      contentMesh,
+      labelCanvas: cv,
+      labelCtx: ctx,
+      labelTex,
+      outlet: new THREE.Vector3(baseX, throatY - stubH, baseZ)
+    };
+  }
+
+  const headerY = headY + 0.55;
+  function buildHeaderAndDrops(outlet, mat, hoseR) {
+    const headerCenter = new THREE.Vector3(nx, headerY, nz);
+    
+    const headerLen = FISH_SPREAD * (N_FISH - 1) + 0.30;
+    const header = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, headerLen, 10), mat);
+    header.position.copy(headerCenter);
+    header.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirVec.clone().normalize());
+    group.add(header);
+    
+    group.add(makeHose(outlet, headerCenter.clone().add(new THREE.Vector3(0, 0.06, 0)), -0.6, hoseR, mat));
+    
+    slots.forEach((s) => {
+      const from = new THREE.Vector3(s.x, headerY, s.z);
+      const to   = new THREE.Vector3(s.x, headY + 0.13, s.z);
+      group.add(makeHose(from, to, -0.12, 0.032, mat));
+    });
+  }
+
+  const tankOffsetDist = 2.2;
+  const tankX = nx - tankOffsetDist;
+  const tankZ = nz;
+
+  let hData;
+  if (type === 'batter') {
+    const batterTankMat = new THREE.MeshPhongMaterial({ color: 0xd9c088, specular: 0x8a7a55, shininess: 40 });
+    const hoseBatterMat = new THREE.MeshPhongMaterial({ color: 0xe9d28f, transparent: true, opacity: 0.85, shininess: 60 });
+    hData = hopper(tankX, tankZ, batterTankMat, "BATTER", "#8a6a3a");
+    buildHeaderAndDrops(hData.outlet, hoseBatterMat, 0.05);
+  } else {
+    const beanTankMat   = new THREE.MeshPhongMaterial({ color: 0x5a2e1c, specular: 0x6a4a35, shininess: 30 });
+    const hoseBeanMat   = new THREE.MeshPhongMaterial({ color: 0x6b2f1d, transparent: true, opacity: 0.85, shininess: 60 });
+    hData = hopper(tankX, tankZ, beanTankMat, "BEAN", "#5a2818");
+    buildHeaderAndDrops(hData.outlet, hoseBeanMat, 0.045);
+  }
+
+  return {
+    nozzleTipY,
+    slots,
+    contentMesh: hData.contentMesh,
+    labelCanvas: hData.labelCanvas,
+    labelCtx: hData.labelCtx,
+    labelTex: hData.labelTex
+  };
+}
+
+// ---------------------------------------------------------------- wider shared belt
+function buildBelt() {
+  const cv = document.createElement("canvas"); cv.width = 256; cv.height = 64;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#17130f"; ctx.fillRect(0, 0, 256, 64);
+  ctx.strokeStyle = "#332a20"; ctx.lineWidth = 6;
+  for (let x = -64; x < 320; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 20, 32); ctx.lineTo(x, 64); ctx.stroke(); }
+  const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(12, BELT_WIDTH / 1.9);
+
+  const belt = new THREE.Mesh(new THREE.BoxGeometry(24, 0.2, BELT_WIDTH),
+    new THREE.MeshPhongMaterial({ map: tex, color: 0x6b6058, shininess: 8 }));
+  belt.position.set(-11, BELT_TOP - 0.1, BELT_Z); scene.add(belt);
+
+  const railMat = new THREE.MeshPhongMaterial({ color: 0x2a2620, shininess: 20 });
+  [BELT_Z - BELT_WIDTH / 2 - 0.06, BELT_Z + BELT_WIDTH / 2 + 0.06].forEach((z) => {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(24, 0.34, 0.12), railMat);
+    rail.position.set(-11, BELT_TOP + 0.05, z); scene.add(rail);
+  });
+  return { tex };
+}
+
+// ---------------------------------------------------------------- inventory
+let inventoryLabelCanvas, inventoryLabelCtx, inventoryLabelTex, inventoryLabelSprite;
+const productionTimestamps = []; // track waffle drop timestamps for real-time WPM
+const factoryStartTime = performance.now(); // track application runtime
+let historyTimer = 0.0; // cycle tracker for snapshots
+let lapCounter = 1; // Start active tracking from Lap 1
+
+// Active Lap baseline variables for delta calculation
+let currentLapServedStart = 0;
+let currentLapUnderStart = 0;
+let currentLapBurntStart = 0;
+let currentLapCrushedStart = 0;
+let currentLapDefectStart = 0;
+
+// Start with a clean slate containing ONLY the active LAP #1 (진행 중) at launch
+const productionHistory = [
+  { time: "LAP #1 (진행 중)", total: 0, normal: 0, defect: 0, defectRate: "0.0%", _rawServed: 0, _rawUndercooked: 0, _rawBurnt: 0, _rawCrushed: 0, _rawDefects: 0 }
+];
+
+function buildInventoryLabel() {
+  inventoryLabelCanvas = document.createElement("canvas");
+  inventoryLabelCanvas.width = 512;
+  inventoryLabelCanvas.height = 260;
+  inventoryLabelCtx = inventoryLabelCanvas.getContext("2d");
+  inventoryLabelTex = new THREE.CanvasTexture(inventoryLabelCanvas);
+
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: inventoryLabelTex, transparent: true, opacity: 0.85 }));
+  sprite.scale.set(8.8, 4.5, 1); // Significantly larger scale in 3D scene
+  sprite.position.set(-24.5, GROUND_Y + 4.0, BELT_Z); // Floating higher above the box
+  sprite.userData = { isInventoryLabel: true }; // Bind click identification
+  inventoryLabelSprite = sprite;
+  scene.add(sprite);
+
+  updateInventoryLabelVisual();
+}
+
+function updateInventoryLabelVisual() {
+  const ctx = inventoryLabelCtx;
+  const cv = inventoryLabelCanvas;
+  
+  // Clear to fully transparent
+  ctx.clearRect(0, 0, 512, 260);
+
+  // Outline drawing helper for ultimate readability
+  function drawText(text, x, y, font, color) {
+    ctx.font = font;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 10;
+    ctx.strokeStyle = "#0d0a10"; // Very dark outline shadow
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  // Title (large and clear)
+  drawText("생산량 (OUTPUT)", 256, 50, "bold 54px Helvetica, Arial, sans-serif", "#ffffff");
+
+  // Counts (huge and color-coded)
+  drawText(`붕어빵 : ${inventoryBungCount} 개`, 256, 140, "bold 48px Helvetica, Arial, sans-serif", "#ff8a3c");
+  drawText(`국화빵 : ${inventoryGukCount} 개`, 256, 220, "bold 48px Helvetica, Arial, sans-serif", "#ffea70");
+  
+  inventoryLabelTex.needsUpdate = true;
+}
+
+function buildInventoryPlatform() {
+  const boxMat = new THREE.MeshPhongMaterial({ color: 0x3d2c1e, specular: 0x110d0a, shininess: 10 });
+  const box = new THREE.Group();
+  box.position.set(-24.5, GROUND_Y + 0.3, BELT_Z);
+
+  // Box bottom
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.1, 6.0), boxMat);
+  bottom.position.y = -0.25;
+  box.add(bottom);
+
+  // Box walls
+  const wallL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 6.0), boxMat);
+  wallL.position.x = -2.2;
+  box.add(wallL);
+
+  const wallR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 6.0), boxMat);
+  wallR.position.x = 2.2;
+  box.add(wallR);
+
+  const wallF = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.6, 0.1), boxMat);
+  wallF.position.z = 3.0;
+  box.add(wallF);
+
+  const wallB = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.6, 0.1), boxMat);
+  wallB.position.z = -3.0;
+  box.add(wallB);
+
+  scene.add(box);
+}
+
+const SIDE_CAPACITY = INV_COLS * 2 * INV_LAYERS; // 30 per side
+
+function addToInventory(mesh) {
+  inventoryCount++;
+  productionTimestamps.push(performance.now()); // Record waffle drop time for rolling WPM
+  const lineIndex = mesh.userData && mesh.userData.lineIndex !== undefined ? mesh.userData.lineIndex : 0;
+  
+  if (lineIndex === 1) {
+    inventoryGukCount++;
+    if (inventoryGukPlaced < SIDE_CAPACITY) {
+      const idx = inventoryGukPlaced++;
+      const perLayer = INV_COLS * 2;
+      const layer = Math.floor(idx / perLayer);
+      const rem = idx % perLayer;
+      const col = Math.floor(rem / 2);
+      const row = rem % 2;
+      
+      const x = INV_ORIGIN_X - col * INV_DX;
+      const z_center = -14.4; // Line 2 drop Z-center
+      const z = z_center + (row - 0.5) * INV_DZ;
+      const y = INV_BASE_Y + layer * INV_DY;
+      mesh.position.set(x, y, z);
+      mesh.rotation.set(0, 0, 0);
+    } else {
+      scene.remove(mesh);
+    }
+  } else {
+    inventoryBungCount++;
+    if (inventoryBungPlaced < SIDE_CAPACITY) {
+      const idx = inventoryBungPlaced++;
+      const perLayer = INV_COLS * 2;
+      const layer = Math.floor(idx / perLayer);
+      const rem = idx % perLayer;
+      const col = Math.floor(rem / 2);
+      const row = rem % 2;
+      
+      const x = INV_ORIGIN_X - col * INV_DX;
+      const z_center = -12.0; // Line 1 drop Z-center
+      const z = z_center + (row - 0.5) * INV_DZ;
+      const y = INV_BASE_Y + layer * INV_DY;
+      mesh.position.set(x, y, z);
+      mesh.rotation.set(0, 0, 0);
+    } else {
+      scene.remove(mesh);
+    }
+  }
+  
+  els.invOut.textContent = inventoryCount;
+  if (els.invBungOut) els.invBungOut.textContent = inventoryBungCount;
+  if (els.invGukOut) els.invGukOut.textContent = inventoryGukCount;
+  updateInventoryLabelVisual();
+}
+
+// ---------------------------------------------------------------- build everything
+const lines = [];
+for (let i = 0; i < LINE_X.length; i++) {
+  const lineB = (i === 1) ? 14.4 : 12.0; // Line 2 is longer (Gukhwabang)
+  const uBatter    = (lineB - 4.8) / (4 * A + 4 * lineB);
+  const uBean      = (lineB + 0.24) / (4 * A + 4 * lineB);
+  const uFlip      = (2 * lineB + A + 2.4) / (4 * A + 4 * lineB);
+  const uDischarge = (4 * lineB + 3 * A - 1.5) / (4 * A + 4 * lineB);
+
+  const group = new THREE.Group(); scene.add(group);
+  const furniture = buildLineFurniture(group, LINE_X[i], lineB);
+  const labelName = `LINE ${i + 1}`;
+  const labelSprite = makeLabelSprite(labelName, "#ff8a3c");
+  labelSprite.position.set(LINE_X[i], TRACK_Y + 2.2, 0);
+  group.add(labelSprite);
+  const units = [];
+  const speedMul = 1 + (i - (LINE_X.length - 1) / 2) * 0.06;
+  for (let j = 0; j < N_UNITS; j++) {
+    const unit = buildUnit(group, i);
+    const u = ((j / N_UNITS) % 1.0 + 1.0) % 1.0;
+    unit.u = u; unit.prevU = u;
+    
+    const pt = getTrackPoint(u, lineB);
+    unit.root.position.set(LINE_X[i] + pt.x, TRACK_Y, pt.z);
+    unit.root.rotation.y = pt.rotY;
+
+    unit.filled = false;
+    unit.cookProgress = 0.0;
+    unit.batterFilled = false;
+    unit.batterAnim = 1;
+    unit.beanFilled = false;
+    unit.beanAnim = 1;
+    unit.flipDone = false;
+    unit.flip.rotation.x = 0;
+    unit.lidAngle = LID_OPEN;
+    unit.lidTarget = LID_OPEN;
+    unit.lidPivot.rotation.z = LID_OPEN;
+    for (const f of unit.fishMeshes) f.visible = false;
+    for (const b of unit.beanMeshes) b.visible = false;
+    units.push(unit);
+  }
+  const sensorObj = buildTempSensor(group, LINE_X[i], lineB, i);
+  const sensorMesh = sensorObj.sensorGroup;
+  lines.push({
+    group,
+    units,
+    furniture,
+    lineX: LINE_X[i],
+    lineB,
+    uBatter,
+    uBean,
+    uFlip,
+    uDischarge,
+    speedMul,
+    omega: 0.3,
+    fireTemp: 220.0,
+    actFireTemp: 220.0,
+    moldTemp: 220.0 * 0.90 + 22.0 * 0.10,
+    bakeDuration: 15.0,
+    roomTemp: 22.0,
+    roomHumidity: 50.0,
+    beltSpeed: 1.4,
+    beltGap: 0.40,
+    batterQty: 100.0,
+    beanQty: 100.0,
+    isBatterRefilling: false,
+    isBeanRefilling: false,
+    batterRefillTimer: 0.0,
+    beanRefillTimer: 0.0,
+    sensorMesh: sensorMesh, // store reference for Raycasting click detection
+    tempHistory: [], // array for storing temperature history
+    measurementLogs: [], // array for scanned history logs (resolves TypeError)
+    sensorTemp: 220.0 * 0.90 + 22.0 * 0.10,
+    activeMoldIndex: -1,
+    dispCanvas: sensorObj.dispCanvas,
+    dispCtx: sensorObj.dispCtx,
+    dispTex: sensorObj.dispTex
+  });
+}
+const belt = buildBelt();
+buildInventoryPlatform();
+buildInventoryLabel();
+
+// Initialize the dispenser labels and visuals at startup
+for (const line of lines) {
+  if (line.furniture.batDisp) {
+    updateHopperVisuals(line.furniture.batDisp, "BATTER", line.batterQty, line.isBatterRefilling);
+    updateHopperVisuals(line.furniture.beanDisp, "BEAN", line.beanQty, line.isBeanRefilling);
+  }
+}
+
+const fallingWaffles = [], drips = [];
+
+const els = {
+  roomTemp: document.getElementById("roomTemp"), roomTempVal: document.getElementById("roomTempVal"),
+  roomHumidity: document.getElementById("roomHumidity"), roomHumidityVal: document.getElementById("roomHumidityVal"),
+  beltSpeed: document.getElementById("beltSpeed"), beltSpeedVal: document.getElementById("beltSpeedVal"),
+
+  fireTemp1: document.getElementById("fireTemp1"), fireTempVal1: document.getElementById("fireTempVal1"),
+  lineSpeed1: document.getElementById("lineSpeed1"), lineSpeedVal1: document.getElementById("lineSpeedVal1"),
+  speedOut1: document.getElementById("speedOut1"),
+
+  fireTemp2: document.getElementById("fireTemp2"), fireTempVal2: document.getElementById("fireTempVal2"),
+  lineSpeed2: document.getElementById("lineSpeed2"), lineSpeedVal2: document.getElementById("lineSpeedVal2"),
+  speedOut2: document.getElementById("speedOut2"),
+
+  servedOut: document.getElementById("servedOut"),
+  burntOut: document.getElementById("burntOut"),
+  undercookedOut: document.getElementById("undercookedOut"),
+  crushedOut: document.getElementById("crushedOut"),
+  defectRateOut: document.getElementById("defectRateOut"),
+  invOut: document.getElementById("invOut"),
+  invBungOut: document.getElementById("invBungOut"),
+  invGukOut: document.getElementById("invGukOut"),
+  btnPause: document.getElementById("btnPause"),
+  simSpeed: document.getElementById("simSpeed"),
+  simSpeedVal: document.getElementById("simSpeedVal"),
+  batterQtyOut1: document.getElementById("batterQtyOut1"),
+  beanQtyOut1: document.getElementById("beanQtyOut1"),
+  batterQtyOut2: document.getElementById("batterQtyOut2"),
+  beanQtyOut2: document.getElementById("beanQtyOut2"),
+};
+
+let flameScale = 1.0;
+
+let isPaused = true;
+let simSpeedMultiplier = 1.0;
+let simTimeSec = 0.0; // Accumulated virtual simulation time
+
+function recomputeBake(dt) {
+  const gRoomTemp = parseFloat(els.roomTemp.value);
+  const gRoomHumid = parseFloat(els.roomHumidity.value);
+  BELT_SPEED = parseFloat(els.beltSpeed.value);
+  BELT_GAP = 0.80; // Fixed safety collision gap threshold
+
+  // Update targets from UI for Line 1
+  if (lines[0]) {
+    lines[0].fireTemp = parseFloat(els.fireTemp1.value);
+    lines[0].speedMul = parseFloat(els.lineSpeed1.value);
+    lines[0].roomTemp = gRoomTemp;
+    lines[0].roomHumidity = gRoomHumid;
+  }
+  // Update targets from UI for Line 2
+  if (lines[1]) {
+    lines[1].fireTemp = parseFloat(els.fireTemp2.value);
+    lines[1].speedMul = parseFloat(els.lineSpeed2.value);
+    lines[1].roomTemp = gRoomTemp;
+    lines[1].roomHumidity = gRoomHumid;
+  }
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Actual fire temperature rises with a time constant of 3.0 seconds
+    line.actFireTemp += (line.fireTemp - line.actFireTemp) * Math.min(1.0, dt / 3.0);
+    
+    const targetMoldTemp = line.actFireTemp * 0.90 + line.roomTemp * 0.10;
+    
+    // Apply thermal inertia (time constant = 8.0 seconds)
+    line.moldTemp += (targetMoldTemp - line.moldTemp) * Math.min(1.0, dt / 8.0);
+    
+    // Bake duration depends on moldTemp and humidity
+    let d = 15.0 + (200 - line.moldTemp) * 0.15 + (line.roomHumidity - 50) * 0.08;
+    line.bakeDuration = Math.max(9.0, Math.min(24.0, d));
+    
+    const baseOmega = ((DISCHARGE_U - U_BATTER) * 2 * Math.PI) / line.bakeDuration;
+    line.omega = baseOmega * line.speedMul;
+  }
+
+  // Update global displays
+  els.roomTempVal.textContent = gRoomTemp;
+  els.roomHumidityVal.textContent = gRoomHumid;
+  els.beltSpeedVal.textContent = BELT_SPEED.toFixed(1);
+
+  // Update Line 1 readouts
+  if (lines[0]) {
+    els.speedOut1.textContent = (lines[0].omega * 60 / (2 * Math.PI)).toFixed(1) + " rpm";
+    els.fireTempVal1.textContent = lines[0].fireTemp;
+    els.lineSpeedVal1.textContent = lines[0].speedMul.toFixed(1);
+  }
+
+  // Update Line 2 readouts
+  if (lines[1]) {
+    els.speedOut2.textContent = (lines[1].omega * 60 / (2 * Math.PI)).toFixed(1) + " rpm";
+    els.fireTempVal2.textContent = lines[1].fireTemp;
+    els.lineSpeedVal2.textContent = lines[1].speedMul.toFixed(1);
+  }
+}
+
+// Add event listeners for Line 1 inputs
+if (els.fireTemp1) {
+  ["fireTemp1", "lineSpeed1"].forEach(id => {
+    els[id].addEventListener("input", () => recomputeBake(0));
+  });
+}
+// Add event listeners for Line 2 inputs
+if (els.fireTemp2) {
+  ["fireTemp2", "lineSpeed2"].forEach(id => {
+    els[id].addEventListener("input", () => recomputeBake(0));
+  });
+}
+// Add event listeners for global inputs
+if (els.roomTemp) {
+  ["roomTemp", "roomHumidity", "beltSpeed"].forEach(id => {
+    els[id].addEventListener("input", () => recomputeBake(0));
+  });
+}
+
+els.btnPause.addEventListener("click", () => {
+  isPaused = !isPaused;
+  if (isPaused) {
+    els.btnPause.textContent = "▶ Play";
+    els.btnPause.classList.add("paused");
+  } else {
+    els.btnPause.textContent = "⏸ Pause";
+    els.btnPause.classList.remove("paused");
+  }
+});
+els.simSpeed.addEventListener("input", () => {
+  simSpeedMultiplier = parseFloat(els.simSpeed.value);
+  els.simSpeedVal.textContent = simSpeedMultiplier.toFixed(1);
+});
+
+recomputeBake(0);
+
+// Force initialize both lines to their preheated target temperatures at launch
+for (const line of lines) {
+  line.actFireTemp = line.fireTemp;
+  line.moldTemp = line.fireTemp * 0.90 + line.roomTemp * 0.10;
+}
+recomputeBake(0); // refresh bakeDuration/omega using the forced steady-state moldTemp above
+
+// Initialize active Lap statistics baseline
+currentLapServedStart = served;
+currentLapUnderStart = undercooked;
+currentLapBurntStart = burnt;
+currentLapCrushedStart = crushed;
+
+// Initialize original pre-seeded stats to match startup baseline
+for (const entry of productionHistory) {
+  entry._rawServed = served;
+  entry._rawUndercooked = undercooked;
+  entry._rawBurnt = burnt;
+  entry._rawCrushed = crushed;
+}
+
+// Pre-seed each unit's fill/cook state based on its belt position, as if the
+// line had already been running before Play is pressed — so finished waffles
+// start dropping within moments of unpausing instead of after a full bake cycle.
+function prewarmLine(line) {
+  const heatFactor = Math.pow(Math.max(0, (line.moldTemp - 80.0) / 120.0), 3.0);
+  for (const unit of line.units) {
+    const u = unit.u;
+    if (u < line.uBatter || u >= line.uDischarge) continue; // empty stretch of the belt
+
+    unit.filled = true;
+    unit.batterFilled = true;
+    unit.batterAnim = 1;
+    unit.batterWaiting = false;
+    for (const f of unit.fishMeshes) f.visible = true;
+
+    const beanFilled = u >= line.uBean;
+    unit.beanFilled = beanFilled;
+    unit.beanAnim = beanFilled ? 1 : 0;
+    for (const b of unit.beanMeshes) b.visible = false; // covered by lid / not yet poured
+
+    unit.lidTarget = beanFilled ? LID_CLOSED : LID_OPEN;
+    unit.lidAngle = unit.lidTarget;
+    unit.lidPivot.rotation.z = unit.lidAngle;
+
+    const flipped = u >= line.uFlip;
+    unit.flipDone = flipped;
+    unit.flipActive = false;
+    unit.flipT = flipped ? 1 : 0;
+    unit.flip.rotation.x = flipped ? Math.PI : 0;
+
+    const elapsedInOven = (u - line.uBatter) * 2 * Math.PI / line.omega;
+    unit.cookProgress = Math.min(1.5, heatFactor * elapsedInOven / 15.0);
+    unit.moldTemp = 100.0 + (line.moldTemp - 100.0) * Math.min(1.0, unit.cookProgress / 1.0);
+
+    const cp = unit.cookProgress;
+    const col = C_BATTER.clone();
+    if (cp < 0.7) {
+      col.lerp(C_GOLD, cp / 0.7);
+    } else if (cp < 1.05) {
+      col.lerp(C_GOLD, 1.0);
+      col.lerp(C_DARKEN, (cp - 0.7) / 0.35 * 0.5);
+    } else {
+      col.copy(C_DARKEN);
+      col.lerp(new THREE.Color(0x1c0c04), Math.min(1.0, (cp - 1.05) / 0.45));
+    }
+    const glow = 0.05 + 0.22 * Math.sin(Math.min(cp, 1.0) * Math.PI);
+    for (let k = 0; k < unit.fishMeshes.length; k++) {
+      unit.fishMats[k].color.copy(col);
+      unit.fishMats[k].emissive.setRGB(glow * 0.9, glow * 0.35, glow * 0.08);
+      unit.fishMeshes[k].scale.set(1, 1, 1);
+    }
+  }
+}
+for (const line of lines) prewarmLine(line);
+
+// ---------------------------------------------------------------- helpers
+const _v = new THREE.Vector3();
+// Removed uFromTheta helper
+function easeInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+
+// Removed rollQuality helper
+
+function updateDefectDisplay() {
+  const rate = served > 0 ? (totalDefects / served * 100).toFixed(1) : '0.0';
+  els.servedOut.textContent = served;
+  els.burntOut.textContent = burnt;
+  els.undercookedOut.textContent = undercooked;
+  els.crushedOut.textContent = crushed;
+  els.defectRateOut.textContent = rate + '%';
+}
+
+// Pre-filling done in buildEverything
+
+// ---------------------------------------------------------------- per-unit update
+function crossedU(prevU, u, targetU) {
+  if (prevU <= u) {
+    return prevU <= targetU && targetU < u;
+  } else {
+    return targetU >= prevU || targetU < u;
+  }
+}
+
+function updateUnit(unit, line, dt) {
+  unit.prevU = unit.u;
+  unit.u = (unit.u + (line.omega * dt) / (2 * Math.PI)) % 1.0;
+  const u = unit.u;
+
+  // Individual mold heat transfer thermodynamics simulation
+  const isHeating = (u >= line.uBatter && u < line.uDischarge);
+  if (isHeating) {
+    unit.moldTemp += (line.moldTemp - unit.moldTemp) * Math.min(1.0, dt / 6.0);
+  } else {
+    unit.moldTemp += (line.roomTemp + 110.0 - unit.moldTemp) * Math.min(1.0, dt / 9.0);
+  }
+
+  // Trigger temperature scan when crossing the sensor beam (Z = -8.0)
+  const sensorU = (line.lineB - 9.5) / (4 * A + 4 * line.lineB);
+  if (crossedU(unit.prevU, u, sensorU)) {
+    const targetUnitIndex = line.units.indexOf(unit) + 1;
+    
+    // Simulate sensor measurement temperature with high frequency signal white noise
+    const noise = (Math.random() - 0.5) * 1.5;
+    let scanTemp = unit.moldTemp + noise;
+    
+    // Outlier signal spike noise (1.5% probability)
+    if (Math.random() < 0.015) {
+      scanTemp += (Math.random() - 0.5) * 10.0;
+    }
+    
+    const nowTime = new Date();
+    const timeStr = nowTime.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + "." + Math.floor(Math.random() * 10);
+    
+    let status = "NORMAL";
+    if (scanTemp > 210) status = "HIGH";
+    else if (scanTemp < 130) status = "LOW";
+    
+    const logEntry = {
+      time: timeStr,
+      target: `MOLD #${targetUnitIndex}`,
+      temp: scanTemp.toFixed(1) + "°C",
+      status: status
+    };
+    
+    line.measurementLogs.unshift(logEntry);
+    if (line.measurementLogs.length > 8) {
+      line.measurementLogs.pop();
+    }
+    
+    // If the sensor panel is open and targeting this line, update UI immediately
+    if (selectedSensorLineIndex !== -1 && lines[selectedSensorLineIndex] === line) {
+      // Intentionally empty: Grid table updates on tick instead of scroll appending
+    }
+  }
+
+  const pt = getTrackPoint(u, line.lineB);
+  unit.root.position.set(line.lineX + pt.x, TRACK_Y, pt.z);
+  unit.root.rotation.y = pt.rotY;
+
+  // Trigger Batter filling at u = line.uBatter
+  // Trigger Batter filling at u = line.uBatter (Only pour if mold is preheated >= 180°C and ingredients are available)
+  if (crossedU(unit.prevU, u, line.uBatter)) {
+    if (line.moldTemp >= 180.0 && line.batterQty > 0 && !line.isBatterRefilling) {
+      unit.filled = true;
+      unit.cookProgress = 0.0;
+      unit.batterFilled = false; // Wait for lid to fully open first
+      unit.batterAnim = 0;
+      unit.batterWaiting = true; // Waiting state
+      unit.beanFilled = false;
+      unit.beanAnim = 0;
+      unit.flipDone = false;
+      unit.flipActive = false;
+      unit.flipT = 0;
+      unit.flip.rotation.x = 0;
+      unit.lidTarget = LID_OPEN;
+      for (const f of unit.fishMeshes) f.visible = false; // Stay hidden until poured
+      for (const b of unit.beanMeshes) b.visible = false;
+
+      // Deduct batter quantity
+      const batterUsage = (unit.lineIndex === 0) ? 0.5 : 0.25; // 붕어빵 0.5%, 국화빵 0.25% (붕어빵이 2배 더 빠르게 사용)
+      line.batterQty = Math.max(0.0, line.batterQty - batterUsage);
+      if (line.batterQty <= 0.0) {
+        line.isBatterRefilling = true;
+        line.batterRefillTimer = 3.0; // 3 seconds to refill
+      }
+    } else {
+      // Keep it empty and clear
+      unit.filled = false;
+      unit.cookProgress = 0.0;
+      unit.batterFilled = false;
+      unit.batterWaiting = false;
+      unit.beanFilled = false;
+      unit.flipDone = false;
+      unit.flipActive = false;
+      unit.flipT = 0;
+      unit.flip.rotation.x = 0;
+      unit.lidTarget = LID_OPEN;
+      for (const f of unit.fishMeshes) f.visible = false;
+      for (const b of unit.beanMeshes) b.visible = false;
+    }
+  }
+
+  // Trigger Bean filling at u = line.uBean (Only if batter was filled and beans are available)
+  if (crossedU(unit.prevU, u, line.uBean)) {
+    if (unit.filled && line.beanQty > 0 && !line.isBeanRefilling) {
+      unit.beanFilled = true;
+      unit.beanAnim = 0;
+      spawnBeanFill(line, unit);
+
+      // Deduct bean quantity
+      const beanUsage = (unit.lineIndex === 0) ? 0.4 : 0.2; // 붕어빵 0.4%, 국화빵 0.2%
+      line.beanQty = Math.max(0.0, line.beanQty - beanUsage);
+      if (line.beanQty <= 0.0) {
+        line.isBeanRefilling = true;
+        line.beanRefillTimer = 3.0; // 3 seconds to refill
+      }
+    } else {
+      unit.beanFilled = false;
+      unit.beanAnim = 1;
+    }
+  }
+
+  if (unit.filled && !unit.flipDone && !unit.flipActive && unit.prevU < line.uFlip && u >= line.uFlip) {
+    unit.flipActive = true; unit.flipT = 0;
+  }
+  if (unit.filled && unit.prevU < line.uDischarge && u >= line.uDischarge) {
+    unit.lidTarget = LID_OPEN;
+    releaseUnit(unit, line);
+  }
+
+  if (unit.batterFilled && unit.batterAnim < 1) {
+    unit.batterAnim = Math.min(1, unit.batterAnim + dt / 0.4);
+  }
+
+  if (unit.beanFilled && unit.beanAnim < 1) {
+    unit.beanAnim = Math.min(1, unit.beanAnim + dt / 0.4);
+    if (unit.beanAnim >= 1) unit.lidTarget = LID_CLOSED;
+  }
+  if (unit.beanFilled) {
+    const beanScale = easeInOut(unit.beanAnim);
+    const showBean = unit.lidTarget === LID_OPEN;
+    for (const b of unit.beanMeshes) {
+      b.scale.set(beanScale, beanScale, beanScale);
+      b.visible = showBean;
+    }
+  } else {
+    for (const b of unit.beanMeshes) {
+      b.visible = false;
+    }
+  }
+
+  if (unit.lidAngle !== unit.lidTarget) {
+    const step = dt * (1.45 / 0.4), diff = unit.lidTarget - unit.lidAngle;
+    unit.lidAngle += Math.sign(diff) * Math.min(Math.abs(diff), step);
+    unit.lidPivot.rotation.z = unit.lidAngle;
+  }
+
+  // If waiting for the lid to open, check if it has reached the open threshold
+  if (unit.batterWaiting && Math.abs(unit.lidAngle - LID_OPEN) < 0.03) {
+    unit.batterWaiting = false;
+    unit.batterFilled = true;
+    unit.batterAnim = 0;
+    for (const f of unit.fishMeshes) f.visible = true;
+    spawnBatterFill(line, unit);
+  }
+
+  if (unit.flipActive) {
+    unit.flipT = Math.min(1, unit.flipT + dt / 0.4);
+    unit.flip.rotation.x = Math.PI * easeInOut(unit.flipT);
+    if (unit.flipT >= 1) { unit.flipActive = false; unit.flipDone = true; }
+  } else if (u >= DISCHARGE_U) {
+    const p = (u - DISCHARGE_U) / (1.0 - DISCHARGE_U);
+    unit.flip.rotation.x = Math.PI * (1.0 - easeInOut(p));
+    unit.flipDone = false;
+  } else {
+    unit.flip.rotation.x = unit.flipDone ? Math.PI : 0;
+  }
+
+  if (unit.filled) {
+    const fillScale = 0.18 + 0.82 * easeInOut(unit.batterAnim * 0.7 + unit.beanAnim * 0.3);
+    
+    // Calculate cooking rate using a cubic temperature relation for realistic chemical browning/burning
+    const heatFactor = Math.pow(Math.max(0, (line.moldTemp - 80.0) / 120.0), 3.0);
+    unit.cookProgress = Math.min(1.5, unit.cookProgress + heatFactor * dt / 15.0);
+
+    const cp = unit.cookProgress;
+    const col = C_BATTER.clone();
+    
+    if (cp < 0.7) {
+      col.lerp(C_GOLD, cp / 0.7);
+    } else if (cp < 1.05) {
+      col.lerp(C_GOLD, 1.0);
+      col.lerp(C_DARKEN, (cp - 0.7) / 0.35 * 0.5);
+    } else {
+      col.copy(C_DARKEN);
+      col.lerp(new THREE.Color(0x1c0c04), Math.min(1.0, (cp - 1.05) / 0.45));
+    }
+
+    const glow = 0.05 + 0.22 * Math.sin(Math.min(cp, 1.0) * Math.PI);
+    for (let k = 0; k < unit.fishMeshes.length; k++) {
+      unit.fishMats[k].color.copy(col);
+      unit.fishMats[k].emissive.setRGB(glow * 0.9, glow * 0.35, glow * 0.08);
+      unit.fishMeshes[k].scale.set(1, fillScale, 1);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- belt placement
+const beltSlots = {};
+function checkOverlap(worldX, worldZ, nowSec, beltSpeed) {
+  const key = Math.round(worldZ * 4);
+  const prev = beltSlots[key];
+  let isOverlapped = false;
+  if (prev) {
+    const prevNowX = prev.x - beltSpeed * (nowSec - prev.t);
+    // Since belt moves in negative X direction, if new waffle is too close to the previous one, it overlaps
+    if (Math.abs(worldX - prevNowX) < BELT_GAP) {
+      isOverlapped = true;
+    }
+  }
+  beltSlots[key] = { x: worldX, t: nowSec };
+  return isOverlapped;
+}
+
+// ---------------------------------------------------------------- discharge / drop
+function releaseUnit(unit, line) {
+  let q = 'perfect';
+  if (unit.cookProgress < 0.75) q = 'undercooked';
+  else if (unit.cookProgress > 1.12) q = 'burnt';
+
+  for (let k = 0; k < unit.fishMeshes.length; k++) {
+    const fish = unit.fishMeshes[k];
+    fish.getWorldPosition(_v);
+    const mat = q === 'burnt' ? BURNT_MAT : q === 'undercooked' ? UNDERCOOKED_MAT : GOLD_MAT;
+    const mesh = createWaffleVisual(unit.lineIndex, mat);
+    mesh.userData = { lineIndex: unit.lineIndex };
+    mesh.position.copy(_v);
+    mesh.rotation.set(unit.flip.rotation.x, unit.root.rotation.y, 0);
+    scene.add(mesh);
+    fallingWaffles.push({
+      mesh, vel: new THREE.Vector3(-BELT_SPEED, -0.5, 0),
+      angVel: new THREE.Vector3((Math.random() - 0.5) * 1.6, (Math.random() - 0.5) * 0.8, (Math.random() - 0.5) * 1.6),
+      landed: false, worldZ: _v.z, quality: q,
+      fishIndex: k,
+      lineIndex: lines.indexOf(line)
+    });
+    fish.visible = false;
+  }
+  unit.filled = false;
+  unit.batterFilled = false;
+  unit.beanFilled = false;
+  for (const b of unit.beanMeshes) b.visible = false;
+}
+
+function updateFalling(dt) {
+  for (let i = fallingWaffles.length - 1; i >= 0; i--) {
+    const w = fallingWaffles[i];
+    if (!w.landed && !w.fallingOff) {
+      // 1. Initial fall from mold to belt
+      w.vel.y -= GRAVITY * dt;
+      w.mesh.position.y += w.vel.y * dt;
+      w.mesh.position.x += w.vel.x * dt;
+      w.mesh.rotation.x += w.angVel.x * dt;
+      w.mesh.rotation.y += w.angVel.y * dt;
+      w.mesh.rotation.z += w.angVel.z * dt;
+      const rest = BELT_TOP + 0.12;
+      if (w.mesh.position.y <= rest) {
+        const nowSec = simTimeSec; // Use virtual simulation time instead of real wall clock time
+        const sx = w.mesh.position.x; // Land exactly where it falls (no pushing/shifting)
+        
+        // Space out 3 lanes for Bungeoppang (around -12.0) and 3 lanes for Gukhwabang (around -14.4) side-by-side
+        const dropZCenter = (w.lineIndex === 0) ? -12.0 : -14.4;
+        const snapZ = dropZCenter + (w.fishIndex - (N_FISH - 1) / 2) * FISH_SPREAD;
+        
+        w.mesh.position.set(sx, rest, snapZ);
+        w.landed = true; w.vel.set(-BELT_SPEED, 0, 0); w.angVel.set(0, 0, 0);
+        served++;
+
+        let hasDefect = false;
+        const isOverlapped = checkOverlap(sx, snapZ, nowSec, BELT_SPEED);
+        if (isOverlapped) {
+          crushed++;
+          // Squash the waffle visually in Y to show it is crushed/overlapped
+          w.mesh.scale.y *= 0.4;
+          w.mesh.position.y -= 0.04;
+          hasDefect = true;
+        }
+
+        if (w.quality === 'burnt') {
+          burnt++;
+          hasDefect = true;
+        } else if (w.quality === 'undercooked') {
+          undercooked++;
+          hasDefect = true;
+        }
+        
+        if (hasDefect) {
+          totalDefects++;
+        }
+        updateDefectDisplay();
+      }
+    } else if (w.landed && !w.fallingOff) {
+      // 2. Sliding along the belt
+      w.mesh.position.x -= BELT_SPEED * dt;
+      w.mesh.rotation.x += (0 - w.mesh.rotation.x) * Math.min(1, dt * 6);
+      w.mesh.rotation.z += (0 - w.mesh.rotation.z) * Math.min(1, dt * 6);
+      if (w.mesh.position.x <= -22.5) {
+        // Fall off the belt edge!
+        w.fallingOff = true;
+        w.landed = false;
+        w.vel.set(-BELT_SPEED, 0, 0); // initial horizontal velocity same as belt
+      }
+    } else if (w.fallingOff) {
+      // 3. Falling off the belt edge into the box
+      w.vel.y -= GRAVITY * dt;
+      w.mesh.position.y += w.vel.y * dt;
+      w.mesh.position.x += w.vel.x * dt;
+      w.mesh.rotation.x += 2.0 * dt; // tumble slightly
+      if (w.mesh.position.y <= INV_BASE_Y) {
+        addToInventory(w.mesh);
+        fallingWaffles.splice(i, 1);
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- streams
+const STREAM_GEO = new THREE.CylinderGeometry(1, 1, 1, 8, 1);
+const BATTER_DRIP_MAT = new THREE.MeshPhongMaterial({ color: 0xe9d28f, emissive: 0x6a5a22, emissiveIntensity: 0.5, shininess: 30, transparent: true });
+const BEAN_DRIP_MAT   = new THREE.MeshPhongMaterial({ color: 0x6b2f1d, emissive: 0x2a0f08, emissiveIntensity: 0.5, shininess: 20, transparent: true });
+
+function spawnBatterFill(line, unit) {
+  const nozzleY = line.furniture.batterNozzleTipY;
+  const slots = line.furniture.batterSlots;
+  for (let k = 0; k < N_FISH; k++) {
+    const s = slots[k];
+    drips.push(makeStream(s.x, s.z, nozzleY, BATTER_DRIP_MAT, 0.0, 0.055));
+  }
+}
+
+function spawnBeanFill(line, unit) {
+  const nozzleY = line.furniture.beanNozzleTipY;
+  const slots = line.furniture.beanSlots;
+  for (let k = 0; k < N_FISH; k++) {
+    const s = slots[k];
+    drips.push(makeStream(s.x, s.z, nozzleY, BEAN_DRIP_MAT, 0.0, 0.040));
+  }
+}
+
+function makeStream(x, z, fromY, mat, delay, radius) {
+  const mesh = new THREE.Mesh(STREAM_GEO, mat.clone());
+  mesh.visible = false;
+  mesh.position.set(x, fromY, z);
+  mesh.scale.set(radius, 0.0001, radius);
+  scene.add(mesh);
+  return { mesh, t: 0, delay, x, z, fromY, toY: TRACK_Y + 0.18, radius };
+}
+function updateDrips(dt) {
+  for (let i = drips.length - 1; i >= 0; i--) {
+    const d = drips[i];
+    if (d.delay > 0) { d.delay -= dt; continue; }
+    d.mesh.visible = true;
+    d.t += dt / 0.4;
+    const t = Math.min(1, d.t);
+    const fullLen = d.fromY - d.toY;
+    let len, topY;
+    if (t < 0.6) {
+      len = fullLen * (t / 0.6);
+      topY = d.fromY;
+      d.mesh.material.opacity = 1;
+    } else {
+      const p = (t - 0.6) / 0.4;
+      len = fullLen * (1 - p);
+      topY = d.toY + len;
+      d.mesh.material.opacity = 1 - p * 0.7;
+    }
+    len = Math.max(0.0001, len);
+    d.mesh.position.set(d.x, topY - len / 2, d.z);
+    d.mesh.scale.set(d.radius, len, d.radius);
+    if (t >= 1) { scene.remove(d.mesh); drips.splice(i, 1); }
+  }
+}
+
+function updateHopperVisuals(disp, labelName, qty, isRefilling) {
+  if (!disp.contentMesh) return;
+  const S = qty / 100.0;
+  disp.contentMesh.scale.y = Math.max(0.001, S);
+  
+  const TANK_BODY_H = 3.0;
+  const CYL_H = TANK_BODY_H * 0.62;
+  const FUN_H = TANK_BODY_H - CYL_H;
+  const hopBotY = TRACK_Y + 2.4;
+  
+  // Shift inner content cylinder Y position as it scales down
+  disp.contentMesh.position.y = (hopBotY + FUN_H + CYL_H / 2) - (1.0 - S) * CYL_H / 2;
+
+  // Redraw Canvas Label Sprite
+  const ctx = disp.labelCtx;
+  const cv = disp.labelCanvas;
+  if (!ctx || !cv) return;
+  
+  // Clear to fully transparent
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  
+  const used = 100.0 - qty;
+  const korName = labelName === "BATTER" ? "반죽" : "팥";
+  const text = isRefilling ? "보충 중..." : `${korName}: ${qty.toFixed(0)}% (사용: ${used.toFixed(0)}%)`;
+  const textColor = isRefilling ? "#ff6666" : (labelName === "BATTER" ? "#ff8a3c" : "#ffea70");
+  
+  // Draw text with a thick dark outline for high contrast on a transparent background
+  ctx.font = "bold 40px Helvetica, Arial, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  
+  ctx.lineWidth = 10;
+  ctx.strokeStyle = "#110d0a"; // Dark contrast border
+  ctx.strokeText(text, cv.width / 2, cv.height / 2);
+  
+  ctx.fillStyle = textColor;
+  ctx.fillText(text, cv.width / 2, cv.height / 2);
+  
+  disp.labelTex.needsUpdate = true;
+}
+
+let last = performance.now();
+function tick(now) {
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.05) dt = 0.05;
+  const rawDt = dt;
+
+  // Apply simulation speed multiplier and pause state
+  dt = dt * simSpeedMultiplier;
+  if (isPaused) dt = 0;
+
+  // Update virtual simulation time
+  simTimeSec += dt;
+
+  // Update temperature histories (with physical noise)
+  for (const line of lines) {
+    const targetX = line.lineX - A; // target sensor position X (-1.5 or -13.5)
+    const targetZ = -8.0;
+    const sensorPos = new THREE.Vector3(targetX, TRACK_Y, targetZ);
+    
+    let minD = Infinity;
+    let closestUnitIndex = -1;
+    for (let j = 0; j < line.units.length; j++) {
+      const uPos = line.units[j].root.position;
+      const d = uPos.distanceTo(sensorPos);
+      if (d < minD) {
+        minD = d;
+        closestUnitIndex = j;
+      }
+    }
+    
+    line.activeMoldIndex = closestUnitIndex !== -1 ? closestUnitIndex + 1 : -1;
+    
+    // Track only the actual mold temperature
+    const baseTemp = line.moldTemp;
+
+    // Add slight signal fluctuation (White Noise)
+    let noise = (Math.random() - 0.5) * 1.4;
+    
+    line.sensorTemp = baseTemp + noise;
+    
+    if (dt > 0) {
+      line.tempHistory.push(line.sensorTemp);
+      if (line.tempHistory.length > 60) {
+        line.tempHistory.shift();
+      }
+    }
+  }
+
+  // Update refill timers
+  for (const line of lines) {
+    if (line.isBatterRefilling) {
+      line.batterRefillTimer -= dt;
+      if (line.batterRefillTimer <= 0) {
+        line.isBatterRefilling = false;
+        line.batterQty = 100.0;
+      }
+    }
+    if (line.isBeanRefilling) {
+      line.beanRefillTimer -= dt;
+      if (line.beanRefillTimer <= 0) {
+        line.isBeanRefilling = false;
+        line.beanQty = 100.0;
+      }
+    }
+  }
+
+  recomputeBake(dt);
+
+  for (const line of lines) for (const unit of line.units) updateUnit(unit, line, dt);
+  updateFalling(dt);
+  updateDrips(dt);
+
+  // Update dispenser 3D textures and meshes
+  for (const line of lines) {
+    if (line.furniture.batDisp) {
+      updateHopperVisuals(line.furniture.batDisp, "BATTER", line.batterQty, line.isBatterRefilling);
+      updateHopperVisuals(line.furniture.beanDisp, "BEAN", line.beanQty, line.isBeanRefilling);
+    }
+  }
+
+  // Update UI panel readouts
+  if (lines[0]) {
+    const l1 = lines[0];
+    els.batterQtyOut1.textContent = l1.isBatterRefilling ? "보충 중..." : `${l1.batterQty.toFixed(0)}% (사용: ${(100 - l1.batterQty).toFixed(0)}%)`;
+    els.batterQtyOut1.className = l1.isBatterRefilling ? "warn" : l1.batterQty < 25 ? "defect" : "cold";
+
+    els.beanQtyOut1.textContent = l1.isBeanRefilling ? "보충 중..." : `${l1.beanQty.toFixed(0)}% (사용: ${(100 - l1.beanQty).toFixed(0)}%)`;
+    els.beanQtyOut1.className = l1.isBeanRefilling ? "warn" : l1.beanQty < 25 ? "defect" : "cold";
+  }
+
+  if (lines[1]) {
+    const l2 = lines[1];
+    els.batterQtyOut2.textContent = l2.isBatterRefilling ? "보충 중..." : `${l2.batterQty.toFixed(0)}% (사용: ${(100 - l2.batterQty).toFixed(0)}%)`;
+    els.batterQtyOut2.className = l2.isBatterRefilling ? "warn" : l2.batterQty < 25 ? "defect" : "cold";
+
+    els.beanQtyOut2.textContent = l2.isBeanRefilling ? "보충 중..." : `${l2.beanQty.toFixed(0)}% (사용: ${(100 - l2.beanQty).toFixed(0)}%)`;
+    els.beanQtyOut2.className = l2.isBeanRefilling ? "warn" : l2.beanQty < 25 ? "defect" : "cold";
+  }
+
+  // Record time-series batch production snapshots based on Belt 1-Lap (Bake Duration cycle)
+  if (dt > 0) {
+    // Average bake duration of active lines as the factory representative lap cycle
+    let repBakeDuration = 15.0;
+    if (lines[0] && lines[1]) {
+      repBakeDuration = (lines[0].bakeDuration + lines[1].bakeDuration) / 2;
+    } else if (lines[0]) {
+      repBakeDuration = lines[0].bakeDuration;
+    }
+    
+    // Calculate real-time active Lap deltas dynamically as they happen (target the last row in array)
+    const deltaServed = served - currentLapServedStart;
+    const deltaUnder = undercooked - currentLapUnderStart;
+    const deltaBurnt = burnt - currentLapBurntStart;
+    const deltaCrushed = crushed - currentLapCrushedStart;
+    
+    const deltaDefects = Math.max(0, totalDefects - currentLapDefectStart);
+    const deltaNormal = Math.max(0, deltaServed - deltaDefects);
+    const windowDefectRate = deltaServed > 0 ? (deltaDefects / deltaServed * 100).toFixed(1) + "%" : "0.0%";
+    
+    const activeIdx = productionHistory.length - 1; // latest active is pushed at the end
+    if (productionHistory[activeIdx]) {
+      productionHistory[activeIdx].time = `LAP #${lapCounter} (진행 중)`;
+      productionHistory[activeIdx].total = deltaServed;
+      productionHistory[activeIdx].normal = deltaNormal;
+      productionHistory[activeIdx].defect = deltaDefects;
+      productionHistory[activeIdx].defectRate = windowDefectRate;
+    }
+    
+    historyTimer += dt;
+    if (historyTimer >= repBakeDuration) {
+      historyTimer = 0.0;
+      
+      // 1. Freeze the current active Lap statistics
+      if (productionHistory[activeIdx]) {
+        productionHistory[activeIdx].time = `LAP #${lapCounter}`;
+        productionHistory[activeIdx]._rawServed = served;
+        productionHistory[activeIdx]._rawUndercooked = undercooked;
+        productionHistory[activeIdx]._rawBurnt = burnt;
+        productionHistory[activeIdx]._rawCrushed = crushed;
+        productionHistory[activeIdx]._rawDefects = totalDefects;
+      }
+      
+      // 2. Shift baseline to next Lap
+      lapCounter++;
+      currentLapServedStart = served;
+      currentLapUnderStart = undercooked;
+      currentLapBurntStart = burnt;
+      currentLapCrushedStart = crushed;
+      currentLapDefectStart = totalDefects;
+      
+      // 3. Push a new active Lap container to the end
+      productionHistory.push({
+        time: `LAP #${lapCounter} (진행 중)`,
+        total: 0,
+        normal: 0,
+        defect: 0,
+        defectRate: "0.0%",
+        _rawServed: served,
+        _rawUndercooked: undercooked,
+        _rawBurnt: burnt,
+        _rawCrushed: crushed,
+        _rawDefects: totalDefects
+      });
+      
+      // 4. Discard oldest entry at index 0 to keep window size <= 6
+      if (productionHistory.length > 6) {
+        productionHistory.shift();
+      }
+    }
+  }
+
+  // Update selected sensor panel data at a throttled rate (every 0.4 seconds) to prevent visual flickering
+  sensorUpdateTimer += rawDt;
+  if (sensorUpdateTimer >= 0.4) {
+    sensorUpdateTimer = 0.0;
+
+    for (let i = 0; i < 2; i++) {
+      if (lines[i]) {
+        updateSensorDisplay(lines[i]); // Update the 4-IRMAN physical digital display panel screen
+      }
+      
+      const panel = document.getElementById(`sensorPanel_${i + 1}`);
+      if (panel && panel.style.display === "block" && lines[i]) {
+        const l = lines[i];
+        document.getElementById(`sensorPanelTitle_${i + 1}`).textContent = `SENSOR #${i + 1} (${i === 0 ? "붕어빵" : "국화빵"})`;
+        document.getElementById(`sensorRealtimeTemp_${i + 1}`).textContent = `${l.sensorTemp.toFixed(1)}°C`;
+        
+        const targetMoldEl = document.getElementById(`sensorTargetMold_${i + 1}`);
+        targetMoldEl.textContent = l.activeMoldIndex !== -1 ? `MOLD #${l.activeMoldIndex}` : "MOLD #1";
+        targetMoldEl.style.color = "#ffffff";
+
+        const tempValEl = document.getElementById(`sensorRealtimeTemp_${i + 1}`);
+        if (l.sensorTemp > 240) {
+          tempValEl.style.color = "#ff4444";
+        } else if (l.sensorTemp < 190) {
+          tempValEl.style.color = "#44ff44";
+        } else {
+          tempValEl.style.color = "#ffea70";
+        }
+
+        // Lazy load the 20 grid cells on first open
+        const grid = document.getElementById(`sensorMoldGrid_${i + 1}`);
+        if (grid && grid.children.length === 0) {
+          grid.innerHTML = "";
+          for (let k = 1; k <= 20; k++) {
+            grid.innerHTML += `
+              <div class="mold-cell">
+                <span class="mold-cell-num">M#${k}</span>
+                <span class="mold-cell-temp" id="moldTempCell_${i + 1}_${k}">—</span>
+              </div>
+            `;
+          }
+        }
+
+        // Update temperatures of all 20 individual molds in the grid panel
+        for (let k = 0; k < 20; k++) {
+          const u = l.units[k];
+          const cell = document.getElementById(`moldTempCell_${i + 1}_${k + 1}`);
+          if (cell && u) {
+            // Gentler fluctuation noise for calm rendering
+            const noise = (Math.random() - 0.5) * 0.8;
+            const displayTemp = u.moldTemp + noise;
+            cell.textContent = `${displayTemp.toFixed(0)}°`;
+            
+            // Color code grid temperatures based on thresholds
+            if (displayTemp > 210) cell.style.color = "#ff4444";
+            else if (displayTemp < 130) cell.style.color = "#44ff44";
+            else cell.style.color = "#ffea70";
+          }
+        }
+      }
+    }
+  }
+
+  // Update inventory QA panel if open in real-time
+  if (document.getElementById("inventoryPanel").style.display === "block") {
+    updateInventoryPanelUI();
+  }
+
+  belt.tex.offset.x = (belt.tex.offset.x + dt * BELT_SPEED * 0.12) % 1;
+  const fl = 0.7 + 0.3 * Math.sin(now * 0.02) + (Math.random() - 0.5) * 0.18;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineFlameScale = line.actFireTemp / 220.0;
+    burnerLights[i].intensity = 0.85 * fl * (lineFlameScale * 0.8 + 0.2);
+    for (const c of line.furniture.burners) {
+      c.scale.y = (0.85 + 0.3 * Math.random()) * lineFlameScale;
+      c.scale.x = lineFlameScale;
+      c.scale.z = lineFlameScale;
+      c.material.color.setRGB(1, 0.42 + 0.12 * Math.random(), 0.08);
+    }
+  }
+
+  if (activePanDir) panCameraStep(activePanDir, rawDt);
+  updateCameraTransition(rawDt);
+  if (controls) controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+// ---------------------------------------------------------------- camera move buttons
+// Directional buttons move the camera continuously for as long as they're held down
+// (see activePanDir + panCameraStep, driven from the tick loop). ⌂ stays a single click.
+document.querySelectorAll("[data-pan]").forEach((btn) => {
+  if (btn.dataset.pan === "home") {
+    btn.addEventListener("click", () => setCameraView("default"));
+    return;
+  }
+  const start = (e) => { e.preventDefault(); activePanDir = btn.dataset.pan; };
+  const stop = () => { if (activePanDir === btn.dataset.pan) activePanDir = null; };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", stop);
+  btn.addEventListener("pointerleave", stop);
+  btn.addEventListener("pointercancel", stop);
+});
+
+// Tab Switching logic
+const tabs = [
+  { btn: document.getElementById("tabBtnLine1"), content: document.getElementById("tabContentLine1") },
+  { btn: document.getElementById("tabBtnLine2"), content: document.getElementById("tabContentLine2") }
+];
+tabs.forEach(t => {
+  t.btn.addEventListener("click", () => {
+    tabs.forEach(x => {
+      x.btn.classList.remove("active");
+      x.content.style.display = "none";
+    });
+    t.btn.classList.add("active");
+    t.content.style.display = "block";
+  });
+});
+
+// Raycasting for Temperature Sensor Clicks
+let selectedSensorLineIndex = -1;
+let sensorUpdateTimer = 0.0; // Throttle timer to prevent UI flickering (updates every 0.4s)
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function onDocumentClick(event) {
+  // Ignore clicks on UI panel controls
+  if (event.target.tagName !== 'CANVAS') return;
+
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  const targets = [];
+  for (const line of lines) {
+    if (line.sensorMesh) targets.push(line.sensorMesh);
+  }
+  if (inventoryLabelSprite) targets.push(inventoryLabelSprite);
+
+  // Set recursive=true to detect all descendant meshes inside the sensor group
+  const intersects = raycaster.intersectObjects(targets, true);
+  if (intersects.length > 0) {
+    const hit = intersects[0].object;
+    if (hit.userData && hit.userData.isSensor) {
+      const lineIdx = hit.userData.lineIndex; // 0 or 1
+      document.getElementById(`sensorPanel_${lineIdx + 1}`).style.display = "block"; // Show the specific sensor window
+    } else if (hit.userData && hit.userData.isInventoryLabel) {
+      document.getElementById("inventoryPanel").style.display = "block"; // Show the inventory QA report window
+      updateInventoryPanelUI(); // Sync data instantly
+    }
+  }
+}
+window.addEventListener("click", onDocumentClick);
+
+// Hover interaction (cursor pointer + emissive highlight + thicker laser beam)
+function onDocumentMouseMove(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+
+  const targets = [];
+  for (const line of lines) {
+    if (line.sensorMesh) targets.push(line.sensorMesh);
+  }
+  if (inventoryLabelSprite) targets.push(inventoryLabelSprite);
+
+  const intersects = raycaster.intersectObjects(targets, true);
+  
+  let hoveredLineIndex = -1;
+  let hoveredInventory = false;
+  if (intersects.length > 0) {
+    const hit = intersects[0].object;
+    if (hit.userData && hit.userData.isSensor) {
+      hoveredLineIndex = hit.userData.lineIndex;
+    } else if (hit.userData && hit.userData.isInventoryLabel) {
+      hoveredInventory = true;
+    }
+  }
+
+  // Change mouse cursor style
+  renderer.domElement.style.cursor = (hoveredLineIndex !== -1 || hoveredInventory) ? "pointer" : "default";
+
+  // Magnify and highlight the inventory text sprite label on hover
+  if (inventoryLabelSprite) {
+    const targetScale = hoveredInventory ? 9.8 : 8.8;
+    inventoryLabelSprite.scale.set(targetScale, targetScale * (4.5 / 8.8), 1);
+    inventoryLabelSprite.material.opacity = hoveredInventory ? 1.0 : 0.85;
+  }
+
+  // Apply visual highlights to the hovered sensor group
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.sensorMesh) continue;
+    
+    const isHovered = (i === hoveredLineIndex);
+    line.sensorMesh.traverse(child => {
+      if (child.isMesh && child.material) {
+        // Highlighting metal parts with subtle glow
+        if (child.material.emissive) {
+          if (child.material.color && child.material.color.getHex() === 0xffaa00) {
+            // Keep yellow warning label color bright, don't override too much
+            child.material.emissive.setHex(isHovered ? 0x442200 : 0x000000);
+          } else if (child.material.color && child.material.color.getHex() === 0x8a8f97) {
+            // Steel Gray frame hover glow (subtle metallic highlights)
+            child.material.emissive.setHex(isHovered ? 0x222222 : 0x000000);
+          } else {
+            child.material.emissive.setHex(isHovered ? 0x242628 : 0x000000);
+          }
+        }
+        // Thicken and brighten the laser beam when hovered
+        if (child.material.color && child.material.color.getHex() === 0xff1111) {
+          child.material.opacity = isHovered ? 0.95 : 0.55;
+          child.scale.x = isHovered ? 1.8 : 1.0;
+          child.scale.z = isHovered ? 1.8 : 1.0;
+        }
+      }
+    });
+  }
+}
+window.addEventListener("mousemove", onDocumentMouseMove);
+
+document.getElementById("closeSensorPanel_1").addEventListener("click", () => {
+  document.getElementById("sensorPanel_1").style.display = "none";
+  const grid = document.getElementById("sensorMoldGrid_1");
+  if (grid) grid.innerHTML = "";
+});
+
+document.getElementById("closeSensorPanel_2").addEventListener("click", () => {
+  document.getElementById("sensorPanel_2").style.display = "none";
+  const grid = document.getElementById("sensorMoldGrid_2");
+  if (grid) grid.innerHTML = "";
+});
+
+document.getElementById("closeInventoryPanel").addEventListener("click", () => {
+  document.getElementById("inventoryPanel").style.display = "none";
+});
+
+// Drag and drop window helper to allow custom layout of floating panels
+function makeDraggable(el) {
+  let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+  const handle = el.querySelector("h3") || el;
+  handle.style.cursor = "move";
+  
+  handle.onmousedown = dragMouseDown;
+
+  function dragMouseDown(e) {
+    e = e || window.event;
+    if (e.target.classList.contains('close-btn')) return;
+    
+    e.preventDefault();
+    pos3 = e.clientX;
+    pos4 = e.clientY;
+    document.onmouseup = closeDragElement;
+    document.onmousemove = elementDrag;
+  }
+
+  function elementDrag(e) {
+    e = e || window.event;
+    e.preventDefault();
+    pos1 = pos3 - e.clientX;
+    pos2 = pos4 - e.clientY;
+    pos3 = e.clientX;
+    pos4 = e.clientY;
+    
+    // Set position relative to container boundaries
+    el.style.top = (el.offsetTop - pos2) + "px";
+    el.style.left = (el.offsetLeft - pos1) + "px";
+    el.style.right = "auto"; // override CSS right placement
+  }
+
+  function closeDragElement() {
+    document.onmouseup = null;
+    document.onmousemove = null;
+  }
+}
+
+// Bind draggable behavior to all floating panels at launch
+makeDraggable(document.getElementById("inventoryPanel"));
+makeDraggable(document.getElementById("sensorPanel_1"));
+makeDraggable(document.getElementById("sensorPanel_2"));
+
+// Repaint helper for the 4-IRMAN console screen display
+function updateSensorDisplay(line) {
+  if (!line.dispCtx || !line.dispTex) return;
+  const ctx = line.dispCtx;
+  const cv = line.dispCanvas;
+  
+  // 1. Clear background to dark gray
+  ctx.fillStyle = "#1e1f22";
+  ctx.fillRect(0, 0, 128, 96);
+  
+  // 2. White top face plate (with brand label and logo block)
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 128, 30);
+  
+  ctx.fillStyle = "#111827"; // black text
+  ctx.font = "bold 13px sans-serif";
+  ctx.fillText("4-IRman", 6, 21);
+  
+  // GASDNA logo block
+  ctx.fillStyle = "#1d4ed8"; // Blue logo box
+  ctx.fillRect(100, 6, 18, 18);
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold 8px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("GD", 109, 18);
+  
+  // 3. Black LED Screen
+  ctx.fillStyle = "#0c0d0e";
+  ctx.fillRect(14, 38, 100, 32);
+  
+  // 4. Red LED digits displaying current temperature
+  const tempVal = line.sensorTemp !== undefined ? Math.round(line.sensorTemp) : 220;
+  ctx.fillStyle = "#ff1e22";
+  ctx.font = "bold 21px monospace";
+  ctx.textAlign = "right";
+  ctx.fillText(tempVal.toString(), 108, 62);
+  
+  // 5. 4 Round Blue console keys (MODE, UP, DOWN, ENTER)
+  ctx.textAlign = "center";
+  ctx.font = "bold 8px sans-serif";
+  const keys = ["m", "▲", "▼", "↵"];
+  for (let j = 0; j < 4; j++) {
+    const kx = 24 + j * 26;
+    const ky = 82;
+    
+    ctx.fillStyle = "#1d4ed8"; // button body
+    ctx.beginPath();
+    ctx.arc(kx, ky, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(keys[j], kx, ky + 3);
+  }
+  
+  line.dispTex.needsUpdate = true;
+}
+
+// UI update helper to render real-time Production QA stats
+function updateInventoryPanelUI() {
+  const total = served;
+  
+  const bung = inventoryBungCount;
+  const guk = inventoryGukCount;
+  
+  // Calculate rolling WPM using a sliding window of the last 20 seconds
+  const now = performance.now();
+  const cutoff = now - 20000; // 20s ago
+  while (productionTimestamps.length > 0 && productionTimestamps[0] < cutoff) {
+    productionTimestamps.shift();
+  }
+  
+  let wpm = productionTimestamps.length * 3; // scale 20 seconds to 60 seconds
+  if (isPaused) wpm = 0;
+  
+  // Calculate total elapsed runtime
+  const elapsedSec = (now - factoryStartTime) / 1000;
+  const min = Math.floor(elapsedSec / 60);
+  const sec = Math.floor(elapsedSec % 60);
+  
+  document.getElementById("qaBungServed").textContent = `${bung} 개`;
+  document.getElementById("qaGukServed").textContent = `${guk} 개`;
+  document.getElementById("qaWpm").textContent = `${wpm} 개/분 (WPM)`;
+  document.getElementById("qaRuntime").textContent = `${min}분 ${sec}초`;
+  
+  // Render time-series history table rows dynamically (Chronological: LAP 1 at top, latest active at bottom)
+  const historyBody = document.getElementById("qaHistoryBody");
+  if (historyBody) {
+    let html = "";
+    if (productionHistory.length === 0) {
+      html = `<tr><td colspan="5" style="color: var(--ink-dim); padding: 8px;">데이터 수집 중...</td></tr>`;
+    } else {
+      for (let i = 0; i < productionHistory.length; i++) {
+        const entry = productionHistory[i];
+        const isLatest = (i === productionHistory.length - 1);
+        const rateVal = parseFloat(entry.defectRate);
+        const rateColor = rateVal > 10.0 ? "#ff4444" : (rateVal > 0.0 ? "#ffea70" : "#44ff44");
+        html += `
+          <tr style="${isLatest ? "background: rgba(255, 255, 255, 0.05); font-weight: bold;" : ""}">
+            <td style="color: var(--ink-dim); font-weight: bold;">${entry.time}</td>
+            <td style="font-weight: bold; color: ${isLatest ? "#fff" : "#eee"};">${entry.total}</td>
+            <td style="color: #44ff44;">${entry.normal}</td>
+            <td style="color: #ff4444;">${entry.defect}</td>
+            <td style="color: ${rateColor}; font-weight: bold;">${entry.defectRate}</td>
+          </tr>
+        `;
+      }
+    }
+    historyBody.innerHTML = html;
+  }
+  
+  document.getElementById("qaUndercooked").textContent = undercooked;
+  document.getElementById("qaBurnt").textContent = burnt;
+  document.getElementById("qaCrushed").textContent = crushed;
+  
+  const rate = total > 0 ? (totalDefects / total * 100) : 0.0;
+  document.getElementById("qaDefectRate").textContent = `${rate.toFixed(1)}%`;
+}
+
+// ---------------------------------------------------------------- resize
+window.addEventListener("resize", () => {
+  const aspect = window.innerWidth / window.innerHeight;
+  camera.left = -VIEW_SIZE * aspect; camera.right = VIEW_SIZE * aspect;
+  camera.top = VIEW_SIZE; camera.bottom = -VIEW_SIZE;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+})();
+</script>
+</body>
+</html>

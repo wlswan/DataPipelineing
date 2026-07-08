@@ -1,0 +1,41 @@
+services:
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: factory-kafka
+    ports:
+      # 컨테이너 밖(호스트)에서 kafka-console-consumer 등으로 확인할 때 쓰는 외부 리스너.
+      - "9094:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # LISTENERS 3개:
+      #  - INTERNAL(kafka:9092)    : 같은 docker network 안(kafka-ui 등)에서 접속하는 용도
+      #  - CONTROLLER(9093)        : KRaft 컨트롤러 간 통신 전용
+      #  - EXTERNAL(localhost:9094): 호스트(윈도우)에서 kafka-console-consumer 등으로 접속하는 용도
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: factory-kafka-ui
+    ports:
+      # 브라우저에서 http://localhost:8080 으로 접속해서 토픽/메시지 흐름을 확인.
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: factory
+      # 같은 docker network 안에서 접속하므로 내부 리스너(kafka:9092)를 쓴다.
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+
+volumes:
+  kafka-data:
