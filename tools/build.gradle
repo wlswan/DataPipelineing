@@ -1,0 +1,32 @@
+// sim 모듈(시뮬레이터)이 이미 떠 있는 상태에서 프로토콜이 제대로 동작하는지 확인하는
+// 개발용 CLI 클라이언트 모음. 진입점이 여러 개라 application 플러그인 대신 JavaExec
+// 태스크를 각각 등록한다. 배포 대상이 아니므로 Dockerfile 없음.
+plugins {
+    id 'java'
+}
+
+dependencies {
+    implementation 'com.ghgande:j2mod:3.3.0'
+    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
+}
+
+tasks.register('runModbusTestClient', JavaExec) {
+    group = 'verification'
+    description = 'Modbus TCP 테스트 클라이언트 실행 (값 읽기 + 화력목표 SV 쓰기 테스트)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.factory.sim.client.ModbusTestClient'
+}
+
+tasks.register('runMqttTestClient', JavaExec) {
+    group = 'verification'
+    description = 'MQTT 테스트 클라이언트 실행 (실내온습도 토픽 구독 확인)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.factory.sim.client.MqttTestClient'
+}
+
+tasks.register('runModbusJsonPoller', JavaExec) {
+    group = 'verification'
+    description = 'Modbus Input Register를 한 번 읽어 JSON으로 출력하는 CLI (NiFi ExecuteStreamCommand용)'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.factory.sim.client.ModbusJsonPoller'
+}

@@ -1,5 +1,6 @@
 package com.factory.sim.streams;
 
+import com.factory.sim.common.JsonFields;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;

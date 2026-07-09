@@ -1,0 +1,15 @@
+// factory.modbus + factory.roomenv 를 라인ID로 join/정규화해서 factory.linestate에
+// 다시 쓰는 Kafka Streams 앱.
+plugins {
+    id 'java'
+    id 'application'
+}
+
+dependencies {
+    implementation 'org.apache.kafka:kafka-streams:3.8.0'
+    implementation project(':common')
+}
+
+application {
+    mainClass = 'com.factory.sim.streams.LineStateStreams'
+}

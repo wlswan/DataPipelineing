@@ -8,7 +8,6 @@ import java.util.Locale;
 /**
  * Modbus Input Register(화력/몰드 실측온도, 생산개수 누적)를 한 번 읽어서 JSON 한 줄을
  * 표준출력에 찍고 종료하는 커맨드라인 도구.
- *
  * <p>NiFi 1.x는 Modbus 프로세서를 기본 제공하지 않는다. 대신 NiFi가 표준으로 갖고 있는
  * {@code ExecuteStreamCommand} 프로세서가 이 클래스를 주기적으로 실행해서, stdout으로
  * 나온 JSON을 flowfile 내용으로 받아가는 방식으로 Modbus 폴링을 흉내낸다. 즉 이 클래스는

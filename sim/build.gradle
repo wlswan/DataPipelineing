@@ -1,0 +1,24 @@
+// 공장 시뮬레이터 본체. 라인마다 Modbus TCP 서버를 열고, 임베디드 MQTT 브로커에
+// 실내온습도를 발행한다. Kafka를 전혀 모른다 - 순수 산업 프로토콜 소스 역할만 한다.
+plugins {
+    id 'java'
+    id 'application'
+}
+
+dependencies {
+    // Modbus TCP 서버/클라이언트 구현체
+    implementation 'com.ghgande:j2mod:3.3.0'
+
+    // MQTT 클라이언트 (발행)
+    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
+
+    // 임베디드 MQTT 브로커 (외부 mosquitto 등을 설치하지 않고 JVM 안에서 브로커까지 실행)
+    implementation 'io.moquette:moquette-broker:0.17'
+
+    // j2mod/moquette가 사용하는 SLF4J 로깅을 콘솔에 출력해주는 구현체
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
+}
+
+application {
+    mainClass = 'com.factory.sim.Main'
+}

@@ -1,0 +1,5 @@
+// 여러 서비스(Kafka Streams 앱, DB sink)가 같이 쓰는 순수 유틸리티만 모아둔 모듈.
+// 외부 라이브러리 의존성이 없다 - JsonFields가 정규식만으로 JSON 필드를 뽑아내기 때문.
+plugins {
+    id 'java-library'
+}

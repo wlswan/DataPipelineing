@@ -1,0 +1,23 @@
+// sim 모듈(Modbus/MQTT)이 이미 떠 있는 상태에서 별도 프로세스로 실행하는 브릿지.
+// Modbus를 폴링하고 MQTT를 구독해서 Kafka(factory.modbus / factory.roomenv)로 직접 발행한다.
+plugins {
+    id 'java'
+    id 'application'
+}
+
+dependencies {
+    // sim의 ModbusServer에 클라이언트로 접속하기 위한 Modbus 구현체
+    implementation 'com.ghgande:j2mod:3.3.0'
+
+    // sim의 임베디드 브로커에 구독자로 접속하기 위한 MQTT 클라이언트
+    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
+
+    // Kafka producer 클라이언트
+    implementation 'org.apache.kafka:kafka-clients:3.8.0'
+
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
+}
+
+application {
+    mainClass = 'com.factory.sim.bridge.KafkaBridge'
+}

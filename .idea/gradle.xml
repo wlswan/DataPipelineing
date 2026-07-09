@@ -8,6 +8,14 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/common" />
+            <option value="$PROJECT_DIR$/db-sink" />
+            <option value="$PROJECT_DIR$/history-server" />
+            <option value="$PROJECT_DIR$/kafka-bridge" />
+            <option value="$PROJECT_DIR$/linestate-streams" />
+            <option value="$PROJECT_DIR$/sim" />
+            <option value="$PROJECT_DIR$/tools" />
+            <option value="$PROJECT_DIR$/ws-server" />
           </set>
         </option>
         <option name="myGradleHome" value="" />

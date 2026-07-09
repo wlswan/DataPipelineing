@@ -1,0 +1,14 @@
+// factory.linestate 를 구독해서 브라우저(WebSocket)로 그대로 relay하는 핫 패스 백엔드.
+plugins {
+    id 'java'
+    id 'application'
+}
+
+dependencies {
+    implementation 'org.apache.kafka:kafka-clients:3.8.0'
+    implementation 'org.java-websocket:Java-WebSocket:1.5.6'
+}
+
+application {
+    mainClass = 'com.factory.sim.ws.LiveWebSocketServer'
+}

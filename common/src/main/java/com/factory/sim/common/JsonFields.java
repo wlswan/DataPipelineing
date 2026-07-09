@@ -1,4 +1,4 @@
-package com.factory.sim.streams;
+package com.factory.sim.common;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

@@ -1,1 +1,10 @@
 rootProject.name = 'generator'
+
+include 'common'
+include 'sim'
+include 'tools'
+include 'kafka-bridge'
+include 'linestate-streams'
+include 'db-sink'
+include 'ws-server'
+include 'history-server'

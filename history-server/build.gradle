@@ -1,0 +1,14 @@
+// line_state 하이퍼테이블의 이력을 브라우저(live-monitor.html)가 조회할 수 있게 여는
+// HTTP 서버. JDK 내장 HttpServer만 쓰고, DB 접속에만 JDBC 드라이버가 필요하다.
+plugins {
+    id 'java'
+    id 'application'
+}
+
+dependencies {
+    implementation 'org.postgresql:postgresql:42.7.4'
+}
+
+application {
+    mainClass = 'com.factory.sim.db.LineHistoryServer'
+}

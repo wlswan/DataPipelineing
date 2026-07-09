@@ -1,6 +1,6 @@
 package com.factory.sim.db;
 
-import com.factory.sim.streams.JsonFields;
+import com.factory.sim.common.JsonFields;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;

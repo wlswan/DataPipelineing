@@ -1,0 +1,15 @@
+// factory.linestate 를 독립된 컨슈머 그룹으로 구독해서 TimescaleDB에 적재하는 콜드 패스 백엔드.
+plugins {
+    id 'java'
+    id 'application'
+}
+
+dependencies {
+    implementation 'org.apache.kafka:kafka-clients:3.8.0'
+    implementation 'org.postgresql:postgresql:42.7.4'
+    implementation project(':common')
+}
+
+application {
+    mainClass = 'com.factory.sim.db.LineStateDbSink'
+}
