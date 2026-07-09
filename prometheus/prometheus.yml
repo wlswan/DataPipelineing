@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: kafka
+    static_configs:
+      - targets: ['kafka-exporter:9308']
+
+  # kafka-bridge / linestate-streams / db-sink는 docker-compose 밖(호스트)에서
+  # ./gradlew run으로 직접 띄우는 프로세스라서, Docker Desktop이 제공하는
+  # host.docker.internal로 호스트에 열린 /metrics 포트에 접근한다.
+  - job_name: kafka-bridge
+    static_configs:
+      - targets: ['host.docker.internal:9101']
+
+  - job_name: linestate-streams
+    static_configs:
+      - targets: ['host.docker.internal:9102']
+
+  - job_name: db-sink
+    static_configs:
+      - targets: ['host.docker.internal:9103']
