@@ -8,6 +8,10 @@ dependencies {
     implementation 'org.apache.kafka:kafka-clients:3.8.0'
     implementation 'org.postgresql:postgresql:42.7.4'
     implementation project(':common')
+
+    // 저장 단계(DB 연결/적재 성공률) 를 Prometheus로 노출하기 위한 클라이언트.
+    implementation 'io.prometheus:simpleclient:0.16.0'
+    implementation 'io.prometheus:simpleclient_httpserver:0.16.0'
 }
 
 application {

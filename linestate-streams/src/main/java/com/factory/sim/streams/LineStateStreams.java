@@ -1,11 +1,15 @@
 package com.factory.sim.streams;
 
 import com.factory.sim.common.JsonFields;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
+import io.prometheus.client.exporter.HTTPServer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
 
@@ -34,11 +38,26 @@ import java.util.Properties;
  */
 public final class LineStateStreams {
 
-    public static void main(String[] args) {
+    // 스트림 스레드가 죽을 때(브로커 접속 끊김 등) 앱 전체가 조용히 멈추는 대신, 대시보드에서
+    // "정규화 단계가 다운/느려짐/정상" 중 어디인지 구분할 수 있도록 상태를 숫자로 노출한다.
+    private static final Gauge STREAMS_STATE = Gauge.build()
+            .name("streams_state")
+            .help("LineStateStreams 앱 상태 (2=RUNNING, 1=REBALANCING/시작 중, 0=그 외/다운)")
+            .register();
+
+    private static final Counter UNCAUGHT_EXCEPTIONS_TOTAL = Counter.build()
+            .name("streams_uncaught_exceptions_total")
+            .help("스트림 스레드에서 잡히지 않은 예외 발생 횟수 (스레드 교체로 이어짐)")
+            .register();
+
+    public static void main(String[] args) throws Exception {
         System.setOut(new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8));
         System.setErr(new PrintStream(new FileOutputStream(FileDescriptor.err), true, StandardCharsets.UTF_8));
 
         String bootstrapServers = System.getProperty("kafka.bootstrapServers", "localhost:9094");
+        int metricsPort = Integer.parseInt(System.getProperty("metrics.port", "9102"));
+
+        HTTPServer metricsServer = new HTTPServer.Builder().withPort(metricsPort).build();
 
         Properties props = new Properties();
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, "factory-linestate-streams");
@@ -49,17 +68,46 @@ public final class LineStateStreams {
         Topology topology = buildTopology();
         KafkaStreams streams = new KafkaStreams(topology, props);
 
+        // 브로커 일시 단절 같은 재시도 가능한 예외로 스트림 스레드가 죽어도 프로세스 전체가
+        // 내려가지 않도록, 스레드를 교체해서 계속 재시도하게 한다. 대신 발생 횟수는 카운터로
+        // 남겨서 "정규화가 계속 예외를 먹으며 겨우 버티는 중"인지 알 수 있게 한다.
+        streams.setUncaughtExceptionHandler(throwable -> {
+            UNCAUGHT_EXCEPTIONS_TOTAL.inc();
+            System.err.println("[LineStateStreams] 처리되지 않은 예외 발생, 스레드를 교체합니다: " + throwable.getMessage());
+            return StreamsUncaughtExceptionHandler.StreamThreadExceptionResponse.REPLACE_THREAD;
+        });
+
+        streams.setStateListener((newState, oldState) -> {
+            STREAMS_STATE.set(stateCode(newState));
+            System.out.println("[LineStateStreams] 상태 전이: " + oldState + " -> " + newState);
+        });
+
         System.out.println("=== LineStateStreams 기동 완료 ===");
         System.out.println("Kafka bootstrap servers : " + bootstrapServers);
         System.out.println("factory.modbus + factory.roomenv -> factory.linestate (라인ID로 join/정규화)");
+        System.out.println("Prometheus 메트릭       : http://localhost:" + metricsPort + "/metrics");
         System.out.println("종료하려면 Ctrl+C 를 누르세요.");
 
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("LineStateStreams 종료 중...");
             streams.close();
+            metricsServer.stop();
         }));
 
         streams.start();
+    }
+
+    /** 대시보드에서 다루기 쉽게 KafkaStreams.State를 3단계 숫자로 단순화한다. */
+    private static double stateCode(KafkaStreams.State newState) {
+        switch (newState) {
+            case RUNNING:
+                return 2;
+            case REBALANCING:
+            case CREATED:
+                return 1;
+            default:
+                return 0;
+        }
     }
 
     static Topology buildTopology() {

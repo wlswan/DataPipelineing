@@ -15,6 +15,10 @@ dependencies {
     // Kafka producer 클라이언트
     implementation 'org.apache.kafka:kafka-clients:3.8.0'
 
+    // 수집 단계(Modbus/MQTT/Kafka 발행) 상태를 Prometheus로 노출하기 위한 클라이언트.
+    implementation 'io.prometheus:simpleclient:0.16.0'
+    implementation 'io.prometheus:simpleclient_httpserver:0.16.0'
+
     runtimeOnly 'org.slf4j:slf4j-simple:2.0.16'
 }
 

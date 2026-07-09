@@ -244,6 +244,24 @@ docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
   라인별 카드에 화력/몰드온도, 실내온습도, 생산개수가 실시간으로 계속 갱신되는 걸 확인할
   수 있다. 카드를 클릭하면 `history-server`(포트 8083)에서 최근 이력을 가져와 보여준다.
 
+### 각 단계의 장애를 구분하기 위한 예외 처리 + Prometheus 메트릭
+
+Kafka consumer group lag만 보면 "이 단계가 밀리고 있다"는 건 알 수 있어도, "왜" 밀리는지는
+구분이 안 된다(예: 센서 자체가 응답이 없는 것과, 센서는 정상인데 Kafka 전송만 실패하는 것은
+관리자 입장에서 조치 방법이 완전히 다르다). 그래서 `kafka-bridge` / `linestate-streams` /
+`db-sink` 세 프로세스는 각자 실패 지점을 세분화해서 자체 `/metrics` 엔드포인트로 노출한다
+(`prometheus/prometheus.yml`에 `host.docker.internal:포트`로 이미 스크레이프 등록됨).
+
+| 프로세스 | 포트 | 노출 지표 | 실패 시 동작 |
+|---|---|---|---|
+| `kafka-bridge` | 9101 | `bridge_modbus_poll_total{line,result}`, `bridge_modbus_connected{line}`, `bridge_kafka_send_total{topic,result}`, `bridge_mqtt_connected`, `bridge_mqtt_reconnect_total` | Modbus 접속 끊김은 라인별로 다음 tick에 재접속 시도. MQTT는 Paho의 자동 재접속(`connectionLost`/`connectComplete` 콜백으로 상태 추적). Kafka 전송 실패는 `producer.send()` 콜백으로 잡아서 카운트(과거엔 콜백이 없어서 조용히 유실됐음). |
+| `linestate-streams` | 9102 | `streams_state`(2=정상, 1=시작/리밸런싱, 0=다운), `streams_uncaught_exceptions_total` | `StreamsUncaughtExceptionHandler`를 등록해 브로커 일시 단절 같은 예외로 스트림 스레드가 죽어도 프로세스 전체가 아니라 스레드만 교체(`REPLACE_THREAD`)해서 계속 재시도. |
+| `db-sink` | 9103 | `dbsink_insert_batches_total{result}`, `dbsink_records_inserted_total`, `dbsink_db_connected`, `dbsink_reconnect_total` | 배치 insert/commit 중 `SQLException`이 나면(과거엔 여기서 프로세스가 죽었음) 연결을 닫고 지수 백오프(1초→최대 30초)로 재연결하며 폴링 루프를 계속 이어감. 실패한 배치의 레코드는 재처리하지 않고 유실됨. |
+
+Grafana 쪽에서 이 지표들을 아직 전용 패널로는 안 붙였다 — 지금은 코드 레벨에서 "죽지 않고
+버티면서 원인별로 카운트한다"까지만 되어 있고, `pipeline-flow`/`pipeline-health` 대시보드는
+여전히 Kafka consumer group lag 기반이다.
+
 ## 사용한 라이브러리
 
 | 용도 | 라이브러리 | 버전 |
@@ -254,3 +272,4 @@ docker compose exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
 | Kafka producer (KafkaBridge용) | `org.apache.kafka:kafka-clients` | 3.8.0 |
 | Kafka Streams (정규화 조인용) | `org.apache.kafka:kafka-streams` | 3.8.0 |
 | WebSocket 서버 (실시간 relay용) | `org.java-websocket:Java-WebSocket` | 1.5.6 |
+| Prometheus 클라이언트 (kafka-bridge/linestate-streams/db-sink `/metrics`) | `io.prometheus:simpleclient`, `simpleclient_httpserver` | 0.16.0 |

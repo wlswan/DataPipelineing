@@ -8,6 +8,10 @@ plugins {
 dependencies {
     implementation 'org.apache.kafka:kafka-streams:3.8.0'
     implementation project(':common')
+
+    // 정규화 단계(스트림 스레드 상태/예외) 를 Prometheus로 노출하기 위한 클라이언트.
+    implementation 'io.prometheus:simpleclient:0.16.0'
+    implementation 'io.prometheus:simpleclient_httpserver:0.16.0'
 }
 
 application {
