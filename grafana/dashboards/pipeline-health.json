@@ -3,47 +3,217 @@
   "uid": "pipeline-health",
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 3,
+  "version": 6,
   "refresh": "5s",
-  "time": { "from": "now-15m", "to": "now" },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
   "panels": [
+    {
+      "id": 90,
+      "type": "row",
+      "title": "🏭 파이프라인 전체 흐름도",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 50,
+      "type": "marcusolsson-dynamictext-panel",
+      "title": "실시간 파이프라인 흐름도 (문제 지점이 빨갛게 깜빡임 · 화살표 숫자 = 밀린 건수)",
+      "description": "센서 → 수집 → Kafka → 정규화 → (DB적재 / 실시간전송) 흐름. 박스가 빨갛게 깜빡이면 그 프로그램이 멈춘/오류 상태, 화살표가 깜빡이면 그 구간에서 데이터가 밀리는 것.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "min(bridge_modbus_connected) or vector(0)",
+          "legendFormat": "sim_health",
+          "refId": "sim_health",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(bridge_kafka_send_total{result=\"failure\"}[1m])) or vector(0)",
+          "legendFormat": "bridge_fail",
+          "refId": "bridge_fail",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(up{job=\"kafka\"}) or vector(0)",
+          "legendFormat": "kafka_up",
+          "refId": "kafka_up",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(streams_state) or vector(0)",
+          "legendFormat": "streams_state",
+          "refId": "streams_state",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(dbsink_db_connected) or vector(0)",
+          "legendFormat": "dbsink_db",
+          "refId": "dbsink_db",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max(kafka_consumergroup_members{consumergroup=\"factory-linestate-ws-backend\"}) or vector(0)",
+          "legendFormat": "ws_up",
+          "refId": "ws_up",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-streams\"}) or vector(0)",
+          "legendFormat": "streams_lag",
+          "refId": "streams_lag",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-db-sink\"}) or vector(0)",
+          "legendFormat": "dbsink_lag",
+          "refId": "dbsink_lag",
+          "instant": true
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-ws-backend\"}) or vector(0)",
+          "legendFormat": "ws_lag",
+          "refId": "ws_lag",
+          "instant": true
+        }
+      ],
+      "options": {
+        "content": "<div class=\"pipe\">\n<div class=\"node\" id=\"n-sim\"><div class=\"t\">① 센서<br>Modbus·MQTT</div><div class=\"s\">—</div></div>\n<div class=\"arr\" id=\"a-sim\"></div>\n<div class=\"node\" id=\"n-bridge\"><div class=\"t\">② 수집<br>KafkaBridge</div><div class=\"s\">—</div></div>\n<div class=\"arr\" id=\"a-bridge\"></div>\n<div class=\"node\" id=\"n-kafka\"><div class=\"t\">Kafka</div><div class=\"s\">—</div></div>\n<div class=\"arr\" id=\"a-kafka\"><span class=\"lbl\" id=\"l-kafka\"></span></div>\n<div class=\"node\" id=\"n-streams\"><div class=\"t\">③ 정규화<br>Streams</div><div class=\"s\">—</div></div>\n<div class=\"split\">\n<div class=\"branch\">\n<div class=\"arr\" id=\"a-dbsink\"><span class=\"lbl\" id=\"l-dbsink\"></span></div>\n<div class=\"node\" id=\"n-dbsink\"><div class=\"t\">④ DB적재<br>DbSink</div><div class=\"s\">—</div></div>\n<div class=\"arr\" id=\"a-ts\"></div>\n<div class=\"node\" id=\"n-timescale\"><div class=\"t\">Timescale<br>DB</div><div class=\"s\">—</div></div>\n</div>\n<div class=\"branch\">\n<div class=\"arr\" id=\"a-ws\"><span class=\"lbl\" id=\"l-ws\"></span></div>\n<div class=\"node\" id=\"n-wsserver\"><div class=\"t\">④ 실시간전송<br>WsServer</div><div class=\"s\">—</div></div>\n<div class=\"arr\" id=\"a-br\"></div>\n<div class=\"node\" id=\"n-browser\"><div class=\"t\">브라우저<br>화면</div><div class=\"s\">표시</div></div>\n</div>\n</div>\n</div>",
+        "defaultContent": "데이터 없음",
+        "renderMode": "data",
+        "editor": {
+          "format": "auto",
+          "language": "html"
+        },
+        "editors": [],
+        "externalStyles": [],
+        "contentPartials": [],
+        "helpers": "",
+        "status": "",
+        "styles": ".pipe { display:flex; align-items:center; gap:8px; padding:10px 6px; overflow-x:auto; }\n.node { min-width:84px; padding:9px 7px; border-radius:9px; text-align:center; color:#fff;\n        background:#2f9e44; border:1px solid rgba(0,0,0,.35); box-shadow:0 1px 3px rgba(0,0,0,.25); }\n.node .t { font-size:12px; font-weight:700; line-height:1.15; }\n.node .s { font-size:11px; margin-top:4px; opacity:.95; font-variant-numeric:tabular-nums; }\n.node.warn { background:#f08c00; }\n.node.bad  { background:#e03131; animation: blink 1s steps(1,end) infinite; }\n.split  { display:flex; flex-direction:column; gap:14px; }\n.branch { display:flex; align-items:center; gap:8px; }\n.arr { position:relative; width:54px; height:26px; flex:0 0 auto; }\n.arr .lbl { position:absolute; top:-13px; left:0; width:100%; text-align:center;\n            font-size:10px; color:#868e96; font-variant-numeric:tabular-nums; }\n.arr::before { content:''; position:absolute; top:11px; left:0; width:42px; height:4px; background:#2f9e44; }\n.arr::after  { content:''; position:absolute; top:5px; left:40px;\n               border-left:12px solid #2f9e44; border-top:8px solid transparent; border-bottom:8px solid transparent; }\n.arr.warn::before { background:#f08c00; } .arr.warn::after { border-left-color:#f08c00; }\n.arr.bad::before  { background:#e03131; animation: blink 1s steps(1,end) infinite; }\n.arr.bad::after   { border-left-color:#e03131; animation: blink 1s steps(1,end) infinite; }\n@keyframes blink { 0%,49% { opacity:1; } 50%,100% { opacity:.2; } }",
+        "afterRender": "\nvar el = context.element;\nvar series = (context.panelData && context.panelData.series) ? context.panelData.series : [];\nvar V = {};\nseries.forEach(function (fr) {\n  var nf = null, fs = fr.fields || [];\n  for (var i = 0; i < fs.length; i++) { if (fs[i].type === 'number') { nf = fs[i]; break; } }\n  if (!nf) return;\n  var vs = (nf.values && nf.values.toArray) ? nf.values.toArray() : (nf.values || []);\n  var last = null;\n  for (var j = vs.length - 1; j >= 0; j--) { if (vs[j] != null && !isNaN(vs[j])) { last = vs[j]; break; } }\n  V[fr.refId] = last;\n});\nfunction up(v)   { return (v != null && v >= 1) ? 'ok' : 'bad'; }\nfunction stt(v)  { return (v >= 2) ? 'ok' : (v >= 1 ? 'warn' : 'bad'); }\nfunction fail(v) { return (v == null) ? 'ok' : (v > 0.01 ? 'bad' : 'ok'); }\nfunction lagc(v) { return (v == null) ? 'ok' : (v >= 500 ? 'bad' : (v >= 50 ? 'warn' : 'ok')); }\nfunction node(id, cls, txt) {\n  var e = el.querySelector('#' + id); if (!e) return;\n  e.classList.remove('ok', 'warn', 'bad'); e.classList.add(cls);\n  var s = e.querySelector('.s'); if (s && txt != null) s.textContent = txt;\n}\nfunction edge(aid, lid, cls, lagv) {\n  var a = el.querySelector('#' + aid);\n  if (a) { a.classList.remove('ok', 'warn', 'bad'); a.classList.add(cls); }\n  if (lid) { var l = el.querySelector('#' + lid); if (l) l.textContent = (lagv != null ? Math.round(lagv) + '건' : ''); }\n}\nnode('n-sim',       up(V.sim_health),   V.sim_health >= 1 ? '정상' : '끊김');\nnode('n-bridge',    fail(V.bridge_fail), V.bridge_fail > 0.01 ? '전송실패' : '정상');\nnode('n-kafka',     up(V.kafka_up),     V.kafka_up >= 1 ? '정상' : '중단');\nnode('n-streams',   stt(V.streams_state), V.streams_state >= 2 ? '정상' : (V.streams_state >= 1 ? '시작중' : '다운'));\nnode('n-dbsink',    up(V.dbsink_db),    V.dbsink_db >= 1 ? '정상' : '끊김');\nnode('n-timescale', up(V.dbsink_db),    V.dbsink_db >= 1 ? '연결됨' : '끊김');\nnode('n-wsserver',  up(V.ws_up),        V.ws_up >= 1 ? '정상' : '중단');\nedge('a-sim',    null,       up(V.sim_health),   null);\nedge('a-bridge', null,       fail(V.bridge_fail), null);\nedge('a-kafka',  'l-kafka',  lagc(V.streams_lag), V.streams_lag);\nedge('a-dbsink', 'l-dbsink', lagc(V.dbsink_lag),  V.dbsink_lag);\nedge('a-ts',     null,       up(V.dbsink_db),     null);\nedge('a-ws',     'l-ws',     lagc(V.ws_lag),      V.ws_lag);\nedge('a-br',     null,       'ok',                null);\n",
+        "wrap": true
+      }
+    },
     {
       "id": 100,
       "title": "① 공장 센서에서 데이터가 들어오고 있는지",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      },
       "panels": []
     },
     {
       "id": 1,
       "title": "온도 / 생산량 데이터 (Modbus)",
-      "description": "공장 라인의 화력·몰드 온도, 생산개수 값이 계속 들어오고 있는지. '중단'이면 시뮬레이터 또는 수집 프로그램(KafkaBridge)이 멈춘 것.",
+      "description": "공장 라인의 화력·몰드 온도, 생산개수 값이 계속 들어오고 있는지. '중단'이면 시뮬레이터 또는 수집 프로그램(KafkaBridge)이 멈춘 것.\n\n**계산식**\n```\nsum(rate(kafka_topic_partition_current_offset{topic=\"factory.modbus\"}[1m]))\n```\n의미: Kafka에 쌓인 누적 메시지 수(offset)가 최근 1분간 **초당 몇 개씩** 늘었는지의 평균. 즉 (1분간 늘어난 메시지 수) ÷ 60초 = 초당 수집 속도.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "중단",
-          "mappings": [
-            { "type": "range", "options": { "from": 0, "to": 0.4, "result": { "text": "중단" } } },
-            { "type": "range", "options": { "from": 0.4, "to": 1000000, "result": { "text": "정상 수집 중" } } }
-          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 0.4 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.4
+              }
             ]
-          }
+          },
+          "decimals": 1
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "sum(rate(kafka_topic_partition_current_offset{topic=\"factory.modbus\"}[1m]))",
           "refId": "A"
         }
@@ -52,32 +222,56 @@
     {
       "id": 2,
       "title": "실내 온습도 데이터 (MQTT)",
-      "description": "실내 온습도 값이 계속 들어오고 있는지. '중단'이면 MQTT 브로커 또는 수집 프로그램이 멈춘 것. (위 패널은 정상인데 이것만 중단이면 MQTT 쪽만 문제)",
+      "description": "실내 온습도 값이 계속 들어오고 있는지. '중단'이면 MQTT 브로커 또는 수집 프로그램이 멈춘 것. (위 패널은 정상인데 이것만 중단이면 MQTT 쪽만 문제)\n\n**계산식**\n```\nsum(rate(kafka_topic_partition_current_offset{topic=\"factory.roomenv\"}[1m]))\n```\n의미: 위와 동일한 방식으로 MQTT(실내환경) 토픽의 초당 수집 속도를 계산.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 1 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "중단",
-          "mappings": [
-            { "type": "range", "options": { "from": 0, "to": 0.05, "result": { "text": "중단" } } },
-            { "type": "range", "options": { "from": 0.05, "to": 1000000, "result": { "text": "정상 수집 중" } } }
-          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 0.05 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 0.05
+              }
             ]
-          }
+          },
+          "decimals": 1
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "sum(rate(kafka_topic_partition_current_offset{topic=\"factory.roomenv\"}[1m]))",
           "refId": "A"
         }
@@ -88,38 +282,86 @@
       "title": "② 온도 데이터 + 환경 데이터를 하나로 합치는 중간 처리",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
       "panels": []
     },
     {
       "id": 10,
       "title": "처리 프로그램이 켜져 있는지",
-      "description": "'꺼짐'이면 이 단계를 담당하는 프로그램(LineStateStreams)이 다운된 것 — 재시작이 필요.",
+      "description": "'꺼짐'이면 이 단계를 담당하는 프로그램(LineStateStreams)이 다운된 것 — 재시작이 필요.\n\n**계산식**\n```\nkafka_consumergroup_members{consumergroup=\"factory-linestate-streams\"}\n```\n의미: 이 컨슈머 그룹에 접속해 있는 프로세스 개수. 0 = 프로그램이 죽어서 아무도 안 붙어있음, 1 이상 = 살아있음.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 9 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "꺼짐",
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "꺼짐 (다운됨)" } } },
-            { "type": "range", "options": { "from": 1, "to": 1000, "result": { "text": "켜져 있음" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "꺼짐 (다운됨)"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 1000,
+                "result": {
+                  "text": "켜져 있음"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "kafka_consumergroup_members{consumergroup=\"factory-linestate-streams\"}",
           "refId": "A"
         }
@@ -128,34 +370,60 @@
     {
       "id": 11,
       "title": "처리 속도가 밀리고 있는지",
-      "description": "들어온 데이터를 얼마나 못 따라가고 있는지. 프로그램은 켜져 있어도 이 값이 크면 처리 속도가 느린 것.",
+      "description": "들어온 데이터를 얼마나 못 따라가고 있는지. 프로그램은 켜져 있어도 이 값이 크면 처리 속도가 느린 것.\n\n**계산식**\n```\nsum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-streams\"})\n```\n의미: (Kafka에 쌓인 최신 메시지 위치) − (이 프로그램이 실제로 읽은 위치)를 모든 파티션에 대해 합산한 값. 즉 '아직 못 읽고 밀려있는 메시지 개수'.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 9 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "정상",
-          "mappings": [
-            { "type": "range", "options": { "from": 0, "to": 50, "result": { "text": "정상" } } },
-            { "type": "range", "options": { "from": 50, "to": 500, "result": { "text": "느려지는 중" } } },
-            { "type": "range", "options": { "from": 500, "to": 100000000, "result": { "text": "많이 밀림" } } }
-          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 50 },
-              { "color": "red", "value": 500 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
             ]
-          }
+          },
+          "decimals": 0
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "sum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-streams\"})",
           "refId": "A"
         }
@@ -166,38 +434,86 @@
       "title": "③ 합쳐진 데이터를 이력 데이터베이스에 저장",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
       "panels": []
     },
     {
       "id": 20,
       "title": "처리 프로그램이 켜져 있는지",
-      "description": "'꺼짐'이면 저장 프로그램(LineStateDbSink)이 다운되었거나 데이터베이스 연결이 끊긴 것.",
+      "description": "'꺼짐'이면 저장 프로그램(LineStateDbSink)이 다운되었거나 데이터베이스 연결이 끊긴 것.\n\n**계산식**\n```\nkafka_consumergroup_members{consumergroup=\"factory-linestate-db-sink\"}\n```\n의미: DB 저장 프로그램(DbSink) 컨슈머 그룹에 접속한 프로세스 개수. 0이면 다운.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 17 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "꺼짐",
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "꺼짐 (다운됨)" } } },
-            { "type": "range", "options": { "from": 1, "to": 1000, "result": { "text": "켜져 있음" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "꺼짐 (다운됨)"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 1000,
+                "result": {
+                  "text": "켜져 있음"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "kafka_consumergroup_members{consumergroup=\"factory-linestate-db-sink\"}",
           "refId": "A"
         }
@@ -206,34 +522,60 @@
     {
       "id": 21,
       "title": "저장 속도가 밀리고 있는지",
-      "description": "저장을 기다리는 데이터가 얼마나 쌓였는지. 크면 DB 저장이 느려지고 있는 것.",
+      "description": "저장을 기다리는 데이터가 얼마나 쌓였는지. 크면 DB 저장이 느려지고 있는 것.\n\n**계산식**\n```\nsum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-db-sink\"})\n```\n의미: DB에 아직 저장하지 못하고 Kafka에 쌓여 대기 중인 메시지 개수의 합.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 17 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "정상",
-          "mappings": [
-            { "type": "range", "options": { "from": 0, "to": 50, "result": { "text": "정상" } } },
-            { "type": "range", "options": { "from": 50, "to": 500, "result": { "text": "느려지는 중" } } },
-            { "type": "range", "options": { "from": 500, "to": 100000000, "result": { "text": "많이 밀림" } } }
-          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 50 },
-              { "color": "red", "value": 500 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
             ]
-          }
+          },
+          "decimals": 0
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "sum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-db-sink\"})",
           "refId": "A"
         }
@@ -244,38 +586,86 @@
       "title": "④ 브라우저 화면으로 실시간 전송",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 39
+      },
       "panels": []
     },
     {
       "id": 30,
       "title": "처리 프로그램이 켜져 있는지",
-      "description": "'꺼짐'이면 실시간 전송 프로그램(LiveWebSocketServer)이 다운된 것. 브라우저 접속 여부와는 별개.",
+      "description": "'꺼짐'이면 실시간 전송 프로그램(LiveWebSocketServer)이 다운된 것. 브라우저 접속 여부와는 별개.\n\n**계산식**\n```\nkafka_consumergroup_members{consumergroup=\"factory-linestate-ws-backend\"}\n```\n의미: 실시간 전송 프로그램(WsServer) 컨슈머 그룹에 접속한 프로세스 개수. 0이면 다운.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 25 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "꺼짐",
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "꺼짐 (다운됨)" } } },
-            { "type": "range", "options": { "from": 1, "to": 1000, "result": { "text": "켜져 있음" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "꺼짐 (다운됨)"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 1000,
+                "result": {
+                  "text": "켜져 있음"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "kafka_consumergroup_members{consumergroup=\"factory-linestate-ws-backend\"}",
           "refId": "A"
         }
@@ -284,34 +674,60 @@
     {
       "id": 31,
       "title": "화면 전송이 밀리고 있는지",
-      "description": "크면 화면이 실시간이 아니라 몇 초씩 늦게 갱신되고 있는 것.",
+      "description": "크면 화면이 실시간이 아니라 몇 초씩 늦게 갱신되고 있는 것.\n\n**계산식**\n```\nsum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-ws-backend\"})\n```\n의미: 브라우저로 아직 전송하지 못하고 Kafka에 쌓여 대기 중인 메시지 개수의 합.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 25 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "정상",
-          "mappings": [
-            { "type": "range", "options": { "from": 0, "to": 50, "result": { "text": "정상" } } },
-            { "type": "range", "options": { "from": 50, "to": 500, "result": { "text": "느려지는 중" } } },
-            { "type": "range", "options": { "from": 500, "to": 100000000, "result": { "text": "많이 밀림" } } }
-          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 50 },
-              { "color": "red", "value": 500 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
             ]
-          }
+          },
+          "decimals": 0
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "sum(kafka_consumergroup_lag{consumergroup=\"factory-linestate-ws-backend\"})",
           "refId": "A"
         }
@@ -322,7 +738,12 @@
       "title": "전체 흐름 한눈에 보기",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
       "panels": []
     },
     {
@@ -330,15 +751,32 @@
       "title": "단계별 밀린 데이터 추이 (선이 올라가는 구간이 문제 지점)",
       "description": "②합치기 / ③DB저장 / ④화면전송 세 단계 중 어디서부터 밀리기 시작했는지 시간 흐름으로 확인.",
       "type": "timeseries",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 33 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
       "fieldConfig": {
-        "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 8 } },
+        "defaults": {
+          "unit": "none",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
         "overrides": []
       },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "label_replace(label_replace(label_replace(sum by (consumergroup) (kafka_consumergroup_lag{consumergroup=~\"factory-linestate-streams|factory-linestate-db-sink|factory-linestate-ws-backend\"}), \"stage\", \"② 데이터 합치기\", \"consumergroup\", \"factory-linestate-streams\"), \"stage\", \"③ DB 저장\", \"consumergroup\", \"factory-linestate-db-sink\"), \"stage\", \"④ 화면 전송\", \"consumergroup\", \"factory-linestate-ws-backend\")",
           "legendFormat": "{{stage}}",
           "refId": "A"
@@ -350,38 +788,86 @@
       "title": "⑤ 각 단계 내부 연결/예외 상태 (\"밀린다\" 말고 \"왜\" 밀리는지)",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
       "panels": []
     },
     {
       "id": 70,
       "title": "① 라인별 Modbus 접속 상태",
-      "description": "라인 하나라도 Modbus 접속이 끊기면 '일부 끊김'. 어느 라인인지는 아래 상세 정보에서 확인.",
+      "description": "라인 하나라도 Modbus 접속이 끊기면 '일부 끊김'. 어느 라인인지는 아래 상세 정보에서 확인.\n\n**계산식**\n```\nmin(bridge_modbus_connected)\n```\n의미: 라인 7개 각각의 Modbus 접속 여부(연결=1, 끊김=0) 중 **가장 작은 값**. 하나라도 끊긴 라인이 있으면 전체 결과가 0이 되어 '일부 끊김'으로 표시.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 43 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 58
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "정보 없음",
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "일부 라인 끊김" } } },
-            { "type": "range", "options": { "from": 1, "to": 1, "result": { "text": "전체 라인 정상" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "일부 라인 끊김"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 1,
+                "result": {
+                  "text": "전체 라인 정상"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "min(bridge_modbus_connected)",
           "refId": "A"
         }
@@ -390,32 +876,75 @@
     {
       "id": 71,
       "title": "① MQTT 브로커 접속 상태",
-      "description": "실내온습도 값을 보내는 MQTT 연결 자체가 끊겼는지. 위 Modbus 패널은 정상인데 이것만 끊기면 MQTT 쪽만 문제.",
+      "description": "실내온습도 값을 보내는 MQTT 연결 자체가 끊겼는지. 위 Modbus 패널은 정상인데 이것만 끊기면 MQTT 쪽만 문제.\n\n**계산식**\n```\nbridge_mqtt_connected\n```\n의미: MQTT 브로커 접속 여부를 그대로 표시. 1=연결됨, 0=끊김.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 43 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 58
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "정보 없음",
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "끊김" } } },
-            { "type": "range", "options": { "from": 1, "to": 1, "result": { "text": "정상" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "끊김"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 1,
+                "result": {
+                  "text": "정상"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "bridge_mqtt_connected",
           "refId": "A"
         }
@@ -424,32 +953,56 @@
     {
       "id": 72,
       "title": "① 수집 → Kafka 전송 자체의 실패",
-      "description": "센서 값은 정상적으로 읽었는데, Kafka로 보내는 것 자체가 실패하는 경우(예: Kafka가 죽음). 위 두 패널이 정상인데 이게 뜨면 Kafka 쪽 문제.",
+      "description": "센서 값은 정상적으로 읽었는데, Kafka로 보내는 것 자체가 실패하는 경우(예: Kafka가 죽음). 위 두 패널이 정상인데 이게 뜨면 Kafka 쪽 문제.\n\n**계산식**\n```\nsum(rate(bridge_kafka_send_total{result=\"failure\"}[1m]))\n```\n의미: 최근 1분간 Kafka 전송 실패 건수가 **초당 몇 건**씩 발생했는지의 평균. 정상이면 0.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 43 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 58
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "정상",
-          "mappings": [
-            { "type": "range", "options": { "from": 0, "to": 0.01, "result": { "text": "정상" } } },
-            { "type": "range", "options": { "from": 0.01, "to": 1000000, "result": { "text": "Kafka 전송 실패 발생" } } }
-          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 0.01 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.01
+              }
             ]
-          }
+          },
+          "decimals": 2
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "sum(rate(bridge_kafka_send_total{result=\"failure\"}[1m]))",
           "refId": "A"
         }
@@ -458,10 +1011,18 @@
     {
       "id": 73,
       "title": "② 정규화 프로그램 내부 예외 (스레드가 죽었다 재시작한 횟수)",
-      "description": "브로커 순간 단절 등으로 처리 스레드가 죽어도 프로그램 자체는 자동으로 스레드를 교체해서 살아있는다. 이 숫자가 계속 늘어나면 '버티고는 있지만 뭔가 계속 문제가 생기는 중'.",
+      "description": "브로커 순간 단절 등으로 처리 스레드가 죽어도 프로그램 자체는 자동으로 스레드를 교체해서 살아있는다. 이 숫자가 계속 늘어나면 '버티고는 있지만 뭔가 계속 문제가 생기는 중'.\n\n**계산식**\n```\nstreams_uncaught_exceptions_total\n```\n의미: 정규화 프로그램(LineStateStreams)의 스레드가 죽어서 재시작된 **누적 횟수**(카운터라서 계속 쌓이기만 함). 숫자 자체보다 '늘어나는 속도'가 중요.",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 50 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 65
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
@@ -469,17 +1030,37 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "red", "value": 1 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
             ]
-          }
+          },
+          "decimals": 0
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "streams_uncaught_exceptions_total",
           "refId": "A"
         }
@@ -488,32 +1069,75 @@
     {
       "id": 74,
       "title": "③ DB 연결 상태 / 재연결 발생 횟수",
-      "description": "DB(TimescaleDB)가 죽었다 살아나도 프로그램은 죽지 않고 자동 재연결한다. '재연결 횟수'가 늘어난다는 건 그 사이에 DB가 한 번 이상 끊겼었다는 뜻(지금은 복구됐어도 기록은 남음).",
+      "description": "DB(TimescaleDB)가 죽었다 살아나도 프로그램은 죽지 않고 자동 재연결한다. '재연결 횟수'가 늘어난다는 건 그 사이에 DB가 한 번 이상 끊겼었다는 뜻(지금은 복구됐어도 기록은 남음).\n\n**계산식**\n```\ndbsink_db_connected\n```\n의미: TimescaleDB 연결 상태를 그대로 표시. 1=연결됨, 0=끊김(재연결 시도 중).",
       "type": "stat",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 50 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 65
+      },
       "fieldConfig": {
         "defaults": {
           "unit": "none",
           "noValue": "정보 없음",
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "DB 연결 끊김 (재연결 시도 중)" } } },
-            { "type": "range", "options": { "from": 1, "to": 1, "result": { "text": "DB 연결됨" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DB 연결 끊김 (재연결 시도 중)"
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 1,
+                "result": {
+                  "text": "DB 연결됨"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
             ]
           }
         },
         "overrides": []
       },
-      "options": { "textMode": "value_and_name", "colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "options": {
+        "textMode": "value",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      },
       "targets": [
         {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "dbsink_db_connected",
           "refId": "A"
         }
@@ -524,31 +1148,79 @@
       "title": "상세 정보 (기술 담당자용 — Kafka 토픽/파티션 단위 + 신규 지표 raw)",
       "type": "row",
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 57 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 72
+      },
       "panels": [
         {
           "id": 3,
           "title": "소스별 누적 수집 건수",
           "type": "table",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 58 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 73
+          },
           "fieldConfig": {
-            "defaults": { "custom": { "align": "center", "displayMode": "auto" } },
+            "defaults": {
+              "custom": {
+                "align": "center",
+                "displayMode": "auto"
+              }
+            },
             "overrides": [
-              { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "displayName", "value": "누적 메시지 수" }] },
-              { "matcher": { "id": "byName", "options": "topic" }, "properties": [
-                { "id": "mappings", "value": [
-                  { "type": "value", "options": {
-                    "factory.modbus": { "text": "Modbus (온도/생산량)" },
-                    "factory.roomenv": { "text": "MQTT (실내환경)" }
-                  } }
-                ] }
-              ] }
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "누적 메시지 수"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "topic"
+                },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "factory.modbus": {
+                            "text": "Modbus (온도/생산량)"
+                          },
+                          "factory.roomenv": {
+                            "text": "MQTT (실내환경)"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
             ]
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
               "expr": "sum by (topic) (kafka_topic_partition_current_offset{topic=~\"factory.modbus|factory.roomenv\"})",
               "format": "table",
               "instant": true,
@@ -560,24 +1232,61 @@
           "id": 12,
           "title": "② 데이터 합치기 단계 — 토픽/파티션별 상세 lag",
           "type": "table",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 58 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 73
+          },
           "fieldConfig": {
             "defaults": {
-              "custom": { "align": "center", "displayMode": "color-background" },
-              "thresholds": { "mode": "absolute", "steps": [
-                { "color": "green", "value": null },
-                { "color": "orange", "value": 50 },
-                { "color": "red", "value": 500 }
-              ] }
+              "custom": {
+                "align": "center",
+                "displayMode": "color-background"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 50
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              }
             },
             "overrides": [
-              { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "displayName", "value": "밀린 건수" }] }
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "밀린 건수"
+                  }
+                ]
+              }
             ]
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
               "expr": "kafka_consumergroup_lag{consumergroup=\"factory-linestate-streams\"} > 0",
               "format": "table",
               "instant": true,
@@ -589,24 +1298,61 @@
           "id": 22,
           "title": "③ DB 저장 단계 — 토픽/파티션별 상세 lag",
           "type": "table",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 65 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 80
+          },
           "fieldConfig": {
             "defaults": {
-              "custom": { "align": "center", "displayMode": "color-background" },
-              "thresholds": { "mode": "absolute", "steps": [
-                { "color": "green", "value": null },
-                { "color": "orange", "value": 50 },
-                { "color": "red", "value": 500 }
-              ] }
+              "custom": {
+                "align": "center",
+                "displayMode": "color-background"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 50
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              }
             },
             "overrides": [
-              { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "displayName", "value": "밀린 건수" }] }
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "밀린 건수"
+                  }
+                ]
+              }
             ]
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
               "expr": "kafka_consumergroup_lag{consumergroup=\"factory-linestate-db-sink\"} > 0",
               "format": "table",
               "instant": true,
@@ -618,24 +1364,61 @@
           "id": 32,
           "title": "④ 화면 전송 단계 — 토픽/파티션별 상세 lag",
           "type": "table",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 65 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 80
+          },
           "fieldConfig": {
             "defaults": {
-              "custom": { "align": "center", "displayMode": "color-background" },
-              "thresholds": { "mode": "absolute", "steps": [
-                { "color": "green", "value": null },
-                { "color": "orange", "value": 50 },
-                { "color": "red", "value": 500 }
-              ] }
+              "custom": {
+                "align": "center",
+                "displayMode": "color-background"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 50
+                  },
+                  {
+                    "color": "red",
+                    "value": 500
+                  }
+                ]
+              }
             },
             "overrides": [
-              { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "displayName", "value": "밀린 건수" }] }
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "밀린 건수"
+                  }
+                ]
+              }
             ]
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
               "expr": "kafka_consumergroup_lag{consumergroup=\"factory-linestate-ws-backend\"} > 0",
               "format": "table",
               "instant": true,
@@ -647,26 +1430,70 @@
           "id": 75,
           "title": "라인별 Modbus 접속 상태 (상세)",
           "type": "table",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 7, "w": 12, "x": 0, "y": 72 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 0,
+            "y": 87
+          },
           "fieldConfig": {
             "defaults": {
-              "custom": { "align": "center", "displayMode": "color-background" },
+              "custom": {
+                "align": "center",
+                "displayMode": "color-background"
+              },
               "mappings": [
-                { "type": "value", "options": { "0": { "text": "끊김" }, "1": { "text": "정상" } } }
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "끊김"
+                    },
+                    "1": {
+                      "text": "정상"
+                    }
+                  }
+                }
               ],
-              "thresholds": { "mode": "absolute", "steps": [
-                { "color": "red", "value": null },
-                { "color": "green", "value": 1 }
-              ] }
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "red",
+                    "value": null
+                  },
+                  {
+                    "color": "green",
+                    "value": 1
+                  }
+                ]
+              }
             },
             "overrides": [
-              { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "displayName", "value": "접속 상태" }] }
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "접속 상태"
+                  }
+                ]
+              }
             ]
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
               "expr": "bridge_modbus_connected",
               "format": "table",
               "instant": true,
@@ -679,20 +1506,50 @@
           "title": "수집/정규화/DB 재연결·실패 원시 카운터",
           "description": "누적 카운터라서 값 자체보다 '늘어나는지'가 중요하다. mqtt_reconnect/db_reconnect가 계속 늘면 해당 연결이 반복적으로 끊기고 있다는 뜻.",
           "type": "table",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 7, "w": 12, "x": 12, "y": 72 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 7,
+            "w": 12,
+            "x": 12,
+            "y": 87
+          },
           "fieldConfig": {
-            "defaults": { "custom": { "align": "center", "displayMode": "auto" } },
+            "defaults": {
+              "custom": {
+                "align": "center",
+                "displayMode": "auto"
+              }
+            },
             "overrides": [
-              { "matcher": { "id": "byName", "options": "Value" }, "properties": [{ "id": "displayName", "value": "누적 값" }] }
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "Value"
+                },
+                "properties": [
+                  {
+                    "id": "displayName",
+                    "value": "누적 값"
+                  }
+                ]
+              }
             ]
           },
           "transformations": [
-            { "id": "merge", "options": {} }
+            {
+              "id": "merge",
+              "options": {}
+            }
           ],
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
               "expr": "label_replace(bridge_mqtt_reconnect_total or 0 * absent(bridge_mqtt_reconnect_total), \"지표\", \"MQTT 재접속 횟수\", \"job\", \".*\")\n  or label_replace(dbsink_reconnect_total or 0 * absent(dbsink_reconnect_total), \"지표\", \"DB 재연결 횟수\", \"job\", \".*\")\n  or label_replace(streams_uncaught_exceptions_total or 0 * absent(streams_uncaught_exceptions_total), \"지표\", \"정규화 스레드 예외 횟수\", \"job\", \".*\")\n  or label_replace(sum(bridge_kafka_send_total{result=\"failure\"}) or 0 * absent(bridge_kafka_send_total{result=\"failure\"}), \"지표\", \"Kafka 발행 실패 누적\", \"job\", \".*\")",
               "format": "table",
               "instant": true,
@@ -704,15 +1561,32 @@
           "id": 6,
           "title": "토픽/파티션별 lag 추이 (raw)",
           "type": "timeseries",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 79 },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 94
+          },
           "fieldConfig": {
-            "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 8 } },
+            "defaults": {
+              "unit": "none",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 8
+              }
+            },
             "overrides": []
           },
           "targets": [
             {
-              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
               "expr": "kafka_consumergroup_lag{consumergroup=~\"factory-linestate-streams|factory-linestate-db-sink|factory-linestate-ws-backend\"}",
               "legendFormat": "{{consumergroup}} / {{topic}}-{{partition}}",
               "refId": "A"
