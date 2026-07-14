@@ -27,7 +27,7 @@
 
   /* ---------------------------------------------------------------- history overlay */
   :root{
-    --series-fire:#d95926; --series-mold:#3987e5;
+    --series-temp:#d95926;
     --hy-surface:#1a1d21; --hy-ink:#e8e6df; --hy-ink-dim:#9aa0a6; --hy-muted:#7d838a;
     --hy-grid:rgba(255,255,255,.08); --hy-border:#31363c;
   }
@@ -47,7 +47,7 @@
     border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:13px;line-height:1;
   }
   #historyClose:hover{color:var(--hy-ink);border-color:var(--hy-ink-dim)}
-  #historyClose:focus-visible{outline:2px solid var(--series-mold);outline-offset:1px}
+  #historyClose:focus-visible{outline:2px solid var(--series-temp);outline-offset:1px}
   .history-legend{display:flex;gap:16px;margin:10px 0 4px;font-size:12px;color:var(--hy-ink-dim)}
   .history-legend span{display:inline-flex;align-items:center;gap:6px}
   .history-legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
@@ -65,7 +65,7 @@
     background:none;border:none;color:var(--hy-ink-dim);font-size:11.5px;
     text-decoration:underline;cursor:pointer;padding:0;
   }
-  #historyTableToggle:focus-visible{outline:2px solid var(--series-mold);outline-offset:1px}
+  #historyTableToggle:focus-visible{outline:2px solid var(--series-temp);outline-offset:1px}
   .history-table-wrap{max-height:220px;overflow-y:auto;margin-top:8px;font-size:11.5px}
   .history-table-wrap[hidden]{display:none}
   .history-table-wrap table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
@@ -92,8 +92,7 @@
       <button id="historyClose" aria-label="닫기">✕</button>
     </div>
     <div class="history-legend">
-      <span><i style="background:var(--series-fire)"></i>화력(fire)</span>
-      <span><i style="background:var(--series-mold)"></i>몰드(mold)</span>
+      <span><i style="background:var(--series-temp)"></i>적외선 온도(irTemp)</span>
     </div>
     <div class="history-chart-wrap">
       <canvas id="historyCanvas" width="680" height="220"></canvas>
@@ -160,8 +159,8 @@ function connect() {
       return;
     }
     appendLog(
-      `${data.lineId}  fire=${data.fireActual}°C  mold=${data.moldActual}°C  ` +
-      `room=${data.roomTemp}°C/${data.roomHumidity}%  served=${data.servedCount}`
+      `${data.lineId}  irTemp=${data.irTemp}°C  ` +
+      `room=${data.roomTemp}°C/${data.roomHumidity}%`
     );
     updateLineCard(data);
   };
@@ -213,14 +212,9 @@ function drawCard(card, data, flash) {
 
   ctx.font = "32px sans-serif";
   ctx.fillStyle = "#ff9d5c";
-  ctx.fillText(`fire  ${data.fireActual.toFixed(1)} C`, 24, 120);
-  ctx.fillStyle = "#7cc7ff";
-  ctx.fillText(`mold  ${data.moldActual.toFixed(1)} C`, 24, 166);
+  ctx.fillText(`irTemp  ${data.irTemp.toFixed(1)} C`, 24, 120);
   ctx.fillStyle = "#c9e08a";
-  ctx.fillText(`room  ${data.roomTemp.toFixed(1)} C / ${data.roomHumidity.toFixed(0)}%`, 24, 212);
-  ctx.fillStyle = "#9aa0a6";
-  ctx.font = "24px sans-serif";
-  ctx.fillText(`served ${data.servedCount}`, 24, 260);
+  ctx.fillText(`room  ${data.roomTemp.toFixed(1)} C / ${data.roomHumidity.toFixed(0)}%`, 24, 166);
 
   texture.needsUpdate = true;
 }
@@ -379,7 +373,6 @@ async function openHistory(lineId) {
   }
 }
 
-// 화력/몰드 둘 다 같은 단위(°C)라 축 하나만 공유한다 (두 개의 y축을 쓰지 않는다).
 function drawHistoryChart(rows) {
   const width = historyCanvas.width;
   const height = historyCanvas.height;
@@ -387,7 +380,7 @@ function drawHistoryChart(rows) {
   const plotW = width - pad.left - pad.right;
   const plotH = height - pad.top - pad.bottom;
 
-  const values = rows.flatMap((r) => [r.fireActual, r.moldActual]);
+  const values = rows.map((r) => r.irTemp);
   const minV = Math.min(...values);
   const maxV = Math.max(...values);
   const vSpan = Math.max(maxV - minV, 1);
@@ -452,8 +445,7 @@ function drawHistoryChart(rows) {
     hctx.fill();
   };
 
-  drawSeries("fireActual", "#d95926");
-  drawSeries("moldActual", "#3987e5");
+  drawSeries("irTemp", "#d95926");
 
   // hover crosshair + 툴팁
   historyCanvas.onmousemove = (event) => {
@@ -483,9 +475,9 @@ function drawHistoryChart(rows) {
 
     historyTooltip.hidden = false;
     historyTooltip.style.left = (x / scaleX) + "px";
-    historyTooltip.style.top = (yOf(nearest.fireActual) / scaleY) + "px";
+    historyTooltip.style.top = (yOf(nearest.irTemp) / scaleY) + "px";
     historyTooltip.innerHTML =
-      `${fmt(nearest.ts)}<br>화력 ${nearest.fireActual.toFixed(1)}°C · 몰드 ${nearest.moldActual.toFixed(1)}°C`;
+      `${fmt(nearest.ts)}<br>적외선 온도 ${nearest.irTemp.toFixed(1)}°C`;
   };
   historyCanvas.onmouseleave = () => {
     historyTooltip.hidden = true;
@@ -500,12 +492,12 @@ function renderHistoryTable(rows) {
     .reverse()
     .map(
       (r) =>
-        `<tr><td>${fmt(r.ts)}</td><td>${r.fireActual.toFixed(1)}</td><td>${r.moldActual.toFixed(1)}</td>` +
-        `<td>${r.roomTemp.toFixed(1)}</td><td>${r.roomHumidity.toFixed(0)}</td><td>${r.servedCount}</td></tr>`
+        `<tr><td>${fmt(r.ts)}</td><td>${r.irTemp.toFixed(1)}</td>` +
+        `<td>${r.roomTemp.toFixed(1)}</td><td>${r.roomHumidity.toFixed(0)}</td></tr>`
     )
     .join("");
   historyTableWrap.innerHTML =
-    `<table><thead><tr><th>시각</th><th>화력</th><th>몰드</th><th>실내온도</th><th>습도</th><th>생산수</th></tr></thead>` +
+    `<table><thead><tr><th>시각</th><th>적외선온도</th><th>실내온도</th><th>습도</th></tr></thead>` +
     `<tbody>${rowsHtml}</tbody></table>`;
 }
 </script>

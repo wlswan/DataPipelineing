@@ -163,8 +163,8 @@
     },
     {
       "id": 1,
-      "title": "온도 / 생산량 데이터 (Modbus)",
-      "description": "공장 라인의 화력·몰드 온도, 생산개수 값이 계속 들어오고 있는지. '중단'이면 시뮬레이터 또는 수집 프로그램(KafkaBridge)이 멈춘 것.\n\n**계산식**\n```\nsum(rate(kafka_topic_partition_current_offset{topic=\"factory.modbus\"}[1m]))\n```\n의미: Kafka에 쌓인 누적 메시지 수(offset)가 최근 1분간 **초당 몇 개씩** 늘었는지의 평균. 즉 (1분간 늘어난 메시지 수) ÷ 60초 = 초당 수집 속도.",
+      "title": "온도 데이터 (Modbus)",
+      "description": "공장 라인의 적외선 온도 값이 계속 들어오고 있는지. '중단'이면 시뮬레이터 또는 수집 프로그램(KafkaBridge)이 멈춘 것.\n\n**계산식**\n```\nsum(rate(kafka_topic_partition_current_offset{topic=\"factory.modbus\"}[1m]))\n```\n의미: Kafka에 쌓인 누적 메시지 수(offset)가 최근 1분간 **초당 몇 개씩** 늘었는지의 평균. 즉 (1분간 늘어난 메시지 수) ÷ 60초 = 초당 수집 속도.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -1202,7 +1202,7 @@
                         "type": "value",
                         "options": {
                           "factory.modbus": {
-                            "text": "Modbus (온도/생산량)"
+                            "text": "Modbus (온도)"
                           },
                           "factory.roomenv": {
                             "text": "MQTT (실내환경)"

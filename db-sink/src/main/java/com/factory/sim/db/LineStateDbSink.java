@@ -42,8 +42,8 @@ public final class LineStateDbSink {
 
     private static final String INSERT_SQL =
             "INSERT INTO line_state "
-                    + "(ts, line_id, fire_actual, mold_actual, room_temp, room_humidity, served_count) "
-                    + "VALUES (?, ?, ?, ?, ?, ?, ?)";
+                    + "(ts, line_id, ir_temp, room_temp, room_humidity) "
+                    + "VALUES (?, ?, ?, ?, ?)";
 
     // ---- 저장 단계(TimescaleDB 적재) 상태를 Prometheus로 노출한다. ----
     // "컨슈머는 살아있는데 DB 적재만 실패하는 중"인 상황(예: DB 컨테이너 재시작)을
@@ -194,20 +194,16 @@ public final class LineStateDbSink {
     /** factory.linestate JSON 한 건을 INSERT 문의 파라미터로 바인딩한다. */
     private static void bind(PreparedStatement insert, String json) throws SQLException {
         String lineId = JsonFields.str(json, "lineId");
-        double fireActual = JsonFields.num(json, "fireActual", 0);
-        double moldActual = JsonFields.num(json, "moldActual", 0);
+        double irTemp = JsonFields.num(json, "irTemp", 0);
         double roomTemp = JsonFields.num(json, "roomTemp", 0);
         double roomHumidity = JsonFields.num(json, "roomHumidity", 0);
-        int servedCount = (int) JsonFields.num(json, "servedCount", 0);
         long ts = (long) JsonFields.num(json, "ts", System.currentTimeMillis());
 
         insert.setTimestamp(1, new Timestamp(ts));
         insert.setString(2, lineId);
-        insert.setDouble(3, fireActual);
-        insert.setDouble(4, moldActual);
-        insert.setDouble(5, roomTemp);
-        insert.setDouble(6, roomHumidity);
-        insert.setInt(7, servedCount);
+        insert.setDouble(3, irTemp);
+        insert.setDouble(4, roomTemp);
+        insert.setDouble(5, roomHumidity);
     }
 
     /** line_state 하이퍼테이블이 없으면 만든다 (TimescaleDB 확장 활성화 포함). */
@@ -218,11 +214,9 @@ public final class LineStateDbSink {
                     "CREATE TABLE IF NOT EXISTS line_state ("
                             + "ts TIMESTAMPTZ NOT NULL,"
                             + "line_id TEXT NOT NULL,"
-                            + "fire_actual DOUBLE PRECISION,"
-                            + "mold_actual DOUBLE PRECISION,"
+                            + "ir_temp DOUBLE PRECISION,"
                             + "room_temp DOUBLE PRECISION,"
-                            + "room_humidity DOUBLE PRECISION,"
-                            + "served_count INTEGER)");
+                            + "room_humidity DOUBLE PRECISION)");
             statement.execute("SELECT create_hypertable('line_state', 'ts', if_not_exists => true)");
         }
         connection.commit();

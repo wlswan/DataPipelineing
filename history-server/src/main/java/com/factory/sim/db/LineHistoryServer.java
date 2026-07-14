@@ -29,7 +29,7 @@ import java.util.Map;
  * 분담을 코드 구조로도 지킨다.</p>
  *
  * <p>{@code GET /history?lineId=line1&minutes=15} → 최근 N분치 JSON 배열
- * {@code [{"ts":..,"fireActual":..,"moldActual":..,"roomTemp":..,"roomHumidity":..,"servedCount":..}, ...]}
+ * {@code [{"ts":..,"irTemp":..,"roomTemp":..,"roomHumidity":..}, ...]}
  * (오래된 것부터 순서대로).</p>
  *
  * <p>실행: {@code ./gradlew runLineHistoryServer}</p>
@@ -91,7 +91,7 @@ public final class LineHistoryServer {
 
     private static String queryHistory(String jdbcUrl, String dbUser, String dbPassword,
                                         String lineId, int minutes) throws SQLException {
-        String sql = "SELECT ts, fire_actual, mold_actual, room_temp, room_humidity, served_count "
+        String sql = "SELECT ts, ir_temp, room_temp, room_humidity "
                 + "FROM line_state WHERE line_id = ? AND ts > now() - make_interval(mins => ?) "
                 + "ORDER BY ts";
 
@@ -109,14 +109,12 @@ public final class LineHistoryServer {
                     first = false;
                     json.append(String.format(
                             Locale.US,
-                            "{\"ts\":%d,\"fireActual\":%.1f,\"moldActual\":%.1f,"
-                                    + "\"roomTemp\":%.1f,\"roomHumidity\":%.1f,\"servedCount\":%d}",
+                            "{\"ts\":%d,\"irTemp\":%.1f,"
+                                    + "\"roomTemp\":%.1f,\"roomHumidity\":%.1f}",
                             rs.getTimestamp("ts").getTime(),
-                            rs.getDouble("fire_actual"),
-                            rs.getDouble("mold_actual"),
+                            rs.getDouble("ir_temp"),
                             rs.getDouble("room_temp"),
-                            rs.getDouble("room_humidity"),
-                            rs.getInt("served_count")));
+                            rs.getDouble("room_humidity")));
                 }
             }
         }

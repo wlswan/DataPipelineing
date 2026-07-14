@@ -35,18 +35,24 @@ import java.util.concurrent.TimeUnit;
  * 구독해서 Kafka로 발행한다.
  *
  * <p>Modbus 경로: 라인마다 {@link ModbusTCPMaster}로 접속해서 1초 간격으로 Input Register
- * 0~2(화력/몰드 실측온도, 생산개수)를 읽어 {@code factory.modbus} 토픽에 key=lineId로
- * 발행한다.</p>
+ * 0(적외선 온도계 실측온도)을 읽어 {@code factory.modbus} 토픽에 key=lineId로 발행한다.</p>
  *
- * <p>MQTT 경로: 임베디드 브로커에 {@code factory/+/roomEnv} 와일드카드로 구독해서, 토픽
- * 문자열에서 lineId만 뽑아 key로 쓰고 페이로드는 파싱하지 않은 채 그대로
- * {@code factory.roomenv} 토픽에 발행한다.</p>
+ * <p>MQTT 경로: 실내온습도 센서는 라인마다 있는 게 아니라 건물 전체에 하나뿐이므로, 임베디드
+ * 브로커의 {@code factory/roomEnv} 토픽 하나만 구독한다. 페이로드는 파싱하지 않은 채 그대로
+ * 고정 key({@value #ROOM_ENV_KEY})로 {@code factory.roomenv} 토픽에 발행한다.</p>
  *
  * <p>실행: {@code ./gradlew runKafkaBridge}</p>
  */
 public final class KafkaBridge {
 
     private static final long POLL_PERIOD_SECONDS = 1;
+
+    /**
+     * 실내온습도는 라인별 값이 아니라 공장 전체 값 하나뿐이라서, lineId 대신 이 고정 key로
+     * {@code factory.roomenv}에 발행한다. {@code linestate-streams}의 GlobalKTable 조인도
+     * 같은 key를 바라봐야 하므로 값을 바꾸면 그쪽도 맞춰야 한다.
+     */
+    private static final String ROOM_ENV_KEY = "factory";
 
     // ---- 수집 단계(Modbus/MQTT -> Kafka) 상태를 그대로 Prometheus로 노출한다. ----
     // 대시보드에서 "센서에서 데이터가 안 온다"(Modbus 실패)와 "데이터는 오는데 Kafka 전송이
@@ -154,25 +160,22 @@ public final class KafkaBridge {
         mqttClient.connect(options);
 
         IMqttMessageListener roomEnvListener = (topic, message) -> {
-            // 토픽 형태: factory/line{n}/roomEnv -> parts[1] = "line{n}"
-            String[] parts = topic.split("/");
-            String lineId = parts.length >= 2 ? parts[1] : "unknown";
             String payload = new String(message.getPayload(), StandardCharsets.UTF_8);
-            producer.send(new ProducerRecord<>("factory.roomenv", lineId, payload), (metadata, exception) -> {
+            producer.send(new ProducerRecord<>("factory.roomenv", ROOM_ENV_KEY, payload), (metadata, exception) -> {
                 if (exception != null) {
                     KAFKA_SEND_TOTAL.labels("factory.roomenv", "failure").inc();
-                    System.err.println("[KafkaBridge] " + lineId + " roomEnv Kafka 발행 실패: " + exception.getMessage());
+                    System.err.println("[KafkaBridge] roomEnv Kafka 발행 실패: " + exception.getMessage());
                 } else {
                     KAFKA_SEND_TOTAL.labels("factory.roomenv", "success").inc();
                 }
             });
         };
-        mqttClient.subscribe("factory/+/roomEnv", 0, roomEnvListener);
+        mqttClient.subscribe("factory/roomEnv", 0, roomEnvListener);
 
         System.out.println("=== KafkaBridge 기동 완료 (" + lineCount + "개 라인) ===");
         System.out.println("Kafka bootstrap servers : " + bootstrapServers);
         System.out.println("Modbus 폴링 대상        : localhost:" + modbusBasePort + " ~ " + (modbusBasePort + lineCount - 1) + " (1초 간격) -> topic factory.modbus");
-        System.out.println("MQTT 구독               : " + brokerUrl + " factory/+/roomEnv -> topic factory.roomenv");
+        System.out.println("MQTT 구독               : " + brokerUrl + " factory/roomEnv -> topic factory.roomenv (key=" + ROOM_ENV_KEY + ")");
         System.out.println("Prometheus 메트릭       : http://localhost:" + metricsPort + "/metrics");
         System.out.println("종료하려면 Ctrl+C 를 누르세요.");
 
@@ -223,16 +226,14 @@ public final class KafkaBridge {
                     System.out.println("[KafkaBridge] Line " + lineNumber + " Modbus 접속 성공 (" + host + ":" + port + ")");
                 }
 
-                InputRegister[] regs = master.readInputRegisters(0, 3);
-                double fireActual = regs[0].getValue() / 10.0;
-                double moldActual = regs[1].getValue() / 10.0;
-                int servedCount = regs[2].getValue();
+                InputRegister[] regs = master.readInputRegisters(0, 1);
+                double irTemp = regs[0].getValue() / 10.0;
                 MODBUS_POLL_TOTAL.labels(lineId, "success").inc();
 
                 String json = String.format(
                         Locale.US,
-                        "{\"lineId\":\"%s\",\"fireActual\":%.1f,\"moldActual\":%.1f,\"servedCount\":%d,\"ts\":%d}",
-                        lineId, fireActual, moldActual, servedCount, System.currentTimeMillis());
+                        "{\"lineId\":\"%s\",\"irTemp\":%.1f,\"ts\":%d}",
+                        lineId, irTemp, System.currentTimeMillis());
 
                 producer.send(new ProducerRecord<>("factory.modbus", lineId, json), (metadata, exception) -> {
                     if (exception != null) {

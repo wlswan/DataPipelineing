@@ -15,7 +15,7 @@ import java.util.function.IntSupplier;
  * <p>그래서 값을 직접 들고 있지 않고, Modbus 마스터가 값을 물어볼 때마다({@code getValue()} 호출 시)
  * {@link FactoryState}의 getter를 즉시 호출해서 최신 값을 그대로 돌려주는 "얇은 통로(delegate)"
  * 역할만 하는 클래스를 만들었다. 생성자로 {@code IntSupplier}(인자 없이 int를 반환하는 함수)를
- * 받아서, 예를 들어 {@code state::getFireActualX10} 처럼 FactoryState의 getter 메서드 참조를
+ * 받아서, 예를 들어 {@code state::getIrTempX10} 처럼 FactoryState의 getter 메서드 참조를
  * 그대로 넘겨 쓸 수 있다.</p>
  */
 public class DelegatingInputRegister implements InputRegister {

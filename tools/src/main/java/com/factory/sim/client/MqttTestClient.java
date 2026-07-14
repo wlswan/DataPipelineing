@@ -16,9 +16,9 @@ import java.util.concurrent.TimeUnit;
  * MQTT 테스트 클라이언트.
  *
  * <p>시뮬레이터({@code com.factory.sim.Main})가 먼저 떠 있어야 한다. 시뮬레이터 프로세스 안에서
- * 실행 중인 임베디드 브로커(Moquette)에 Paho 클라이언트로 접속해서 {@code factory/+/roomEnv}
- * 와일드카드 토픽을 구독(subscribe)하고, 모든 라인의 실내온습도 메시지가 실제로 도착하는지
- * 확인한다 (수신 로그에 실제 토픽명이 찍히므로 어느 라인에서 온 메시지인지 구분된다).</p>
+ * 실행 중인 임베디드 브로커(Moquette)에 Paho 클라이언트로 접속해서 {@code factory/roomEnv}
+ * 토픽을 구독(subscribe)하고, 공장 전체가 공유하는 실내온습도 메시지가 실제로 도착하는지
+ * 확인한다 (실내온습도 센서는 라인마다 있는 게 아니라 건물 전체에 하나뿐이라 토픽도 하나다).</p>
  *
  * <p>발행 주기가 2초이므로, 메시지 3개를 받을 때까지 최대 30초 기다린다.</p>
  *
@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  */
 public final class MqttTestClient {
 
-    private static final String TOPIC_FILTER = "factory/+/roomEnv";
+    private static final String TOPIC_FILTER = "factory/roomEnv";
     private static final int MESSAGES_TO_WAIT_FOR = 3;
     private static final int WAIT_TIMEOUT_SECONDS = 30;
 

@@ -18,14 +18,14 @@ import java.util.List;
  * <p>하나의 JVM 프로세스 안에서 "라인(생산 라인)" 여러 개를 동시에 흉내낸다. 라인 하나는
  * 최신 PLC 한 대가 자체 이더넷 포트를 갖는 구성을 흉내낸 것이라서, 라인마다 독립된
  * {@link PhysicsSimulator}(물리 계산 스레드)와 독립된 {@link ModbusServer}(자기만의 TCP
- * 포트)를 갖는다. 반면 MQTT는 브로커 하나를 모든 라인이 공유하고, 라인마다 토픽만
- * 다르게 써서 구분한다({@code factory/line{n}/roomEnv}) — 실제로도 IoT 센서들은 보통
- * 브로커 하나에 다 같이 붙고 토픽으로 구분되는 게 일반적이기 때문이다.</p>
+ * 포트)를 갖는다. 반면 실내온습도는 라인마다 있는 게 아니라 건물 전체에 센서가 하나뿐이라고
+ * 가정했기 때문에, {@link RoomEnvironment}/{@link RoomEnvSimulator}/{@link RoomEnvPublisher}는
+ * 라인 개수와 무관하게 프로세스 전체에서 딱 하나씩만 뜬다({@code factory/roomEnv} 토픽 하나로
+ * 모든 라인이 공유).</p>
  *
- * <p>라인 하나 안에서 뜨는 세 모듈({@link PhysicsSimulator}, {@link ModbusServer},
- * {@link RoomEnvPublisher})은 그 라인의 {@link FactoryState} 인스턴스 하나를 공유한다.
- * 셋 중 PhysicsSimulator만 값을 쓰고(write), 나머지 둘은 읽기(read)만 한다는 점이 이
- * 프로젝트의 핵심 설계다.</p>
+ * <p>라인 하나 안에서 뜨는 두 모듈({@link PhysicsSimulator}, {@link ModbusServer})은 그 라인의
+ * {@link FactoryState} 인스턴스 하나를 공유한다. 둘 중 PhysicsSimulator만 값을 쓰고(write),
+ * ModbusServer는 읽기(read)만 한다는 점이 이 프로젝트의 핵심 설계다.</p>
  */
 public final class Main {
 
@@ -34,8 +34,7 @@ public final class Main {
             int lineNumber,
             FactoryState state,
             PhysicsSimulator simulator,
-            ModbusServer modbusServer,
-            RoomEnvPublisher publisher
+            ModbusServer modbusServer
     ) {
     }
 
@@ -59,7 +58,16 @@ public final class Main {
         EmbeddedBroker broker = new EmbeddedBroker(mqttPort);
         broker.start();
 
-        // 2) 라인마다 물리 시뮬레이션 스레드 + Modbus TCP 서버(자기만의 포트) + MQTT 퍼블리셔를 띄운다.
+        // 2) 실내온습도는 건물 전체에 센서가 하나뿐이므로, 라인 루프 밖에서 딱 한 번만 띄운다.
+        RoomEnvironment roomEnvironment = new RoomEnvironment();
+        RoomEnvSimulator roomEnvSimulator = new RoomEnvSimulator(roomEnvironment);
+        roomEnvSimulator.start();
+
+        String brokerUrl = "tcp://localhost:" + mqttPort;
+        RoomEnvPublisher roomEnvPublisher = new RoomEnvPublisher(brokerUrl, roomEnvironment);
+        roomEnvPublisher.start();
+
+        // 3) 라인마다 물리 시뮬레이션 스레드 + Modbus TCP 서버(자기만의 포트)를 띄운다.
         //    라인 n의 Modbus 포트는 modbusBasePort + (n - 1) 이다 (예: 502, 503, 504, ...).
         List<LineRuntime> lines = new ArrayList<>(lineCount);
         for (int lineNumber = 1; lineNumber <= lineCount; lineNumber++) {
@@ -73,36 +81,33 @@ public final class Main {
             ModbusServer modbusServer = new ModbusServer(modbusPort, state);
             modbusServer.start();
 
-            RoomEnvPublisher publisher = new RoomEnvPublisher("tcp://localhost:" + mqttPort, state, lineNumber);
-            publisher.start();
-
-            lines.add(new LineRuntime(lineNumber, state, simulator, modbusServer, publisher));
+            lines.add(new LineRuntime(lineNumber, state, simulator, modbusServer));
         }
 
         System.out.println("=== 붕어빵 공장 시뮬레이터 기동 완료 (" + lineCount + "개 라인) ===");
-        System.out.println("MQTT 브로커 : tcp://localhost:" + mqttPort + " (모든 라인 공유)");
+        System.out.println("MQTT 브로커   : " + brokerUrl + " (모든 라인 공유)");
+        System.out.println("MQTT 토픽     : factory/roomEnv (실내온습도, 건물 전체 공유 센서 1개)");
         System.out.println();
-        System.out.println("라인 | Modbus TCP           | MQTT 토픽");
-        System.out.println("-----|----------------------|--------------------------");
+        System.out.println("라인 | Modbus TCP");
+        System.out.println("-----|----------------------");
         for (LineRuntime line : lines) {
             int modbusPort = modbusBasePort + (line.lineNumber() - 1);
-            System.out.printf(
-                    "%4d | localhost:%-10d | factory/line%d/roomEnv%n",
-                    line.lineNumber(), modbusPort, line.lineNumber());
+            System.out.printf("%4d | localhost:%-10d%n", line.lineNumber(), modbusPort);
         }
         System.out.println();
         System.out.println("종료하려면 Ctrl+C 를 누르세요.");
 
-        // Ctrl+C 등으로 프로세스가 종료될 때, 각 라인을 역순으로 정리한 뒤 공유 브로커를 내린다.
+        // Ctrl+C 등으로 프로세스가 종료될 때, 각 라인을 역순으로 정리한 뒤 공유 자원(온습도, 브로커)을 내린다.
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("시뮬레이터 종료 중...");
             List<LineRuntime> reversed = new ArrayList<>(lines);
             Collections.reverse(reversed);
             for (LineRuntime line : reversed) {
                 line.modbusServer().stop();
-                line.publisher().stop();
                 line.simulator().stop();
             }
+            roomEnvPublisher.stop();
+            roomEnvSimulator.stop();
             broker.stop();
         }));
 

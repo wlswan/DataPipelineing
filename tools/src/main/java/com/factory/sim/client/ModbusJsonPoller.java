@@ -6,7 +6,7 @@ import com.ghgande.j2mod.modbus.procimg.InputRegister;
 import java.util.Locale;
 
 /**
- * Modbus Input Register(화력/몰드 실측온도, 생산개수 누적)를 한 번 읽어서 JSON 한 줄을
+ * Modbus Input Register(적외선 실측온도)를 한 번 읽어서 JSON 한 줄을
  * 표준출력에 찍고 종료하는 커맨드라인 도구.
  * <p>NiFi 1.x는 Modbus 프로세서를 기본 제공하지 않는다. 대신 NiFi가 표준으로 갖고 있는
  * {@code ExecuteStreamCommand} 프로세서가 이 클래스를 주기적으로 실행해서, stdout으로
@@ -15,7 +15,7 @@ import java.util.Locale;
  *
  * <p>실행: {@code java -cp <classpath> com.factory.sim.client.ModbusJsonPoller <host> <port> <lineId>}</p>
  *
- * <p>출력 예시: {@code {"lineId":3,"fireActual":220.1,"moldActual":200.3,"servedCount":12}}</p>
+ * <p>출력 예시: {@code {"lineId":3,"irTemp":200.3}}</p>
  *
  * <p>접속/읽기에 실패하면 표준에러에 메시지를 남기고 0이 아닌 종료 코드로 끝난다 —
  * {@code ExecuteStreamCommand}가 이걸 실패(failure) 관계로 라우팅할 수 있게 하기 위함이다.</p>
@@ -35,16 +35,14 @@ public final class ModbusJsonPoller {
         ModbusTCPMaster master = new ModbusTCPMaster(host, port);
         try {
             master.connect();
-            InputRegister[] regs = master.readInputRegisters(0, 3);
+            InputRegister[] regs = master.readInputRegisters(0, 1);
 
-            double fireActual = regs[0].getValue() / 10.0;
-            double moldActual = regs[1].getValue() / 10.0;
-            int servedCount = regs[2].getValue();
+            double irTemp = regs[0].getValue() / 10.0;
 
             String json = String.format(
                     Locale.US,
-                    "{\"lineId\":%d,\"fireActual\":%.1f,\"moldActual\":%.1f,\"servedCount\":%d}",
-                    lineId, fireActual, moldActual, servedCount);
+                    "{\"lineId\":%d,\"irTemp\":%.1f}",
+                    lineId, irTemp);
 
             System.out.println(json);
         } catch (Exception e) {

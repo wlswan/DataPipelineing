@@ -10,8 +10,8 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
+import org.apache.kafka.streams.kstream.GlobalKTable;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KTable;
 
 import java.io.FileDescriptor;
 import java.io.FileOutputStream;
@@ -21,14 +21,16 @@ import java.util.Locale;
 import java.util.Properties;
 
 /**
- * {@code factory.modbus}(화력/몰드 실측온도, 생산개수)와 {@code factory.roomenv}(실내온습도)
- * 는 소스(Modbus/MQTT)도, 갱신 주기도, 스키마도 다르다. 이 앱은 그 둘을 라인ID(key) 기준으로
- * 합쳐서 하나의 통일된 스키마로 {@code factory.linestate}에 다시 발행한다.
+ * {@code factory.modbus}(적외선 실측온도)와 {@code factory.roomenv}(실내온습도)
+ * 는 소스(Modbus/MQTT)도, 갱신 주기도, 스키마도 다르다. 이 앱은 그 둘을 합쳐서 하나의
+ * 통일된 스키마로 {@code factory.linestate}에 다시 발행한다.
  *
- * <p>{@code factory.modbus}는 1초마다 확정적으로 오는 스트림(KStream)으로, {@code
- * factory.roomenv}는 "그 라인의 가장 최근 온습도 값"을 유지하는 테이블(KTable)로 다룬다.
- * modbus 이벤트가 올 때마다 그 시점의 최신 roomenv 값을 붙이는 stream-table left join이다
- * (roomenv가 아직 한 번도 안 왔으면 null로 처리).</p>
+ * <p>{@code factory.modbus}는 라인마다 값이 다른 스트림(KStream)이지만, {@code factory.roomenv}는
+ * 실내온습도 센서가 건물 전체에 하나뿐이라 라인ID가 없는 "공장 전체 최신값 하나"짜리 테이블이다.
+ * 그래서 key가 같은 레코드끼리 붙이는 보통의 스트림-테이블 join이 아니라, 모든 라인의 modbus
+ * 이벤트가 항상 같은 고정 key({@link #ROOM_ENV_KEY}, {@code KafkaBridge}가 발행할 때 쓰는 것과
+ * 동일한 값)를 바라보고 join하는 GlobalKTable 브로드캐스트 조인을 쓴다 (roomenv가 아직 한 번도
+ * 안 왔으면 null로 처리).</p>
  *
  * <p>이 앱은 저장(DB)도, 화면 전송(WebSocket)도 하지 않는다. 정규화된 결과를 다시 Kafka에
  * 놓는 것까지만 담당하고, 그 뒤는 별도 컨슈머(DB sink / {@link com.factory.sim.ws.LiveWebSocketServer})가
@@ -49,6 +51,13 @@ public final class LineStateStreams {
             .name("streams_uncaught_exceptions_total")
             .help("스트림 스레드에서 잡히지 않은 예외 발생 횟수 (스레드 교체로 이어짐)")
             .register();
+
+    /**
+     * 실내온습도는 라인별 값이 아니라 공장 전체 값 하나뿐이라서, {@code KafkaBridge}가
+     * {@code factory.roomenv}에 발행할 때도 이 고정 key 하나만 쓴다. 값을 바꾸려면 그쪽도
+     * 같이 맞춰야 한다.
+     */
+    private static final String ROOM_ENV_KEY = "factory";
 
     public static void main(String[] args) throws Exception {
         System.setOut(new PrintStream(new FileOutputStream(FileDescriptor.out), true, StandardCharsets.UTF_8));
@@ -84,7 +93,7 @@ public final class LineStateStreams {
 
         System.out.println("=== LineStateStreams 기동 완료 ===");
         System.out.println("Kafka bootstrap servers : " + bootstrapServers);
-        System.out.println("factory.modbus + factory.roomenv -> factory.linestate (라인ID로 join/정규화)");
+        System.out.println("factory.modbus + factory.roomenv -> factory.linestate (공유 온습도 broadcast join/정규화)");
         System.out.println("Prometheus 메트릭       : http://localhost:" + metricsPort + "/metrics");
         System.out.println("종료하려면 Ctrl+C 를 누르세요.");
 
@@ -114,20 +123,24 @@ public final class LineStateStreams {
         StreamsBuilder builder = new StreamsBuilder();
 
         KStream<String, String> modbus = builder.stream("factory.modbus");
-        KTable<String, String> roomEnv = builder.table("factory.roomenv");
+        GlobalKTable<String, String> roomEnv = builder.globalTable("factory.roomenv");
 
-        KStream<String, String> lineState = modbus.leftJoin(roomEnv, LineStateStreams::merge);
+        // 라인ID로 매칭하는 게 아니라, modbus 이벤트가 어느 라인 것이든 항상 같은 고정
+        // key(ROOM_ENV_KEY)로 GlobalKTable을 찾아본다 - "공장 전체가 센서 하나를 공유"를
+        // 그대로 옮긴 것.
+        KStream<String, String> lineState = modbus.leftJoin(
+                roomEnv,
+                (lineId, modbusJson) -> ROOM_ENV_KEY,
+                LineStateStreams::merge);
         lineState.to("factory.linestate");
 
         return builder.build();
     }
 
-    /** modbus JSON(화력/몰드온도, 생산개수)과 roomenv JSON(실내온습도)을 하나의 스키마로 합친다. */
+    /** modbus JSON(적외선 실측온도)과 roomenv JSON(실내온습도)을 하나의 스키마로 합친다. */
     private static String merge(String modbusJson, String roomEnvJson) {
         String lineId = JsonFields.str(modbusJson, "lineId");
-        double fireActual = JsonFields.num(modbusJson, "fireActual", 0);
-        double moldActual = JsonFields.num(modbusJson, "moldActual", 0);
-        int servedCount = (int) JsonFields.num(modbusJson, "servedCount", 0);
+        double irTemp = JsonFields.num(modbusJson, "irTemp", 0);
         long ts = (long) JsonFields.num(modbusJson, "ts", System.currentTimeMillis());
 
         double roomTemp = JsonFields.num(roomEnvJson, "temp", 0);
@@ -135,8 +148,8 @@ public final class LineStateStreams {
 
         return String.format(
                 Locale.US,
-                "{\"lineId\":\"%s\",\"fireActual\":%.1f,\"moldActual\":%.1f,\"servedCount\":%d,"
+                "{\"lineId\":\"%s\",\"irTemp\":%.1f,"
                         + "\"roomTemp\":%.1f,\"roomHumidity\":%.1f,\"ts\":%d}",
-                lineId, fireActual, moldActual, servedCount, roomTemp, roomHumidity, ts);
+                lineId, irTemp, roomTemp, roomHumidity, ts);
     }
 }

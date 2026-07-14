@@ -15,18 +15,15 @@ import com.ghgande.j2mod.modbus.slave.ModbusSlaveFactory;
  * <h2>레지스터 맵</h2>
  * <pre>
  * Input Register (FC=0x04, 읽기전용 - "직접형 센서")
- *   addr 0 : 화력 실측온도, x10 스케일 (2200 = 220.0°C)
- *   addr 1 : 몰드 실측온도, x10 스케일
- *   addr 2 : 생산개수 누적
+ *   addr 0 : 적외선 온도계 실측온도, x10 스케일 (2000 = 200.0°C)
  *
  * Holding Register (FC=0x03 읽기 / FC=0x06 쓰기)
- *   addr 0 : 화력 목표온도(SV), x10 스케일
- *   addr 1 : 벨트속도 지령, x100 스케일 (140 = 1.40Hz)
+ *   addr 0 : 벨트속도 지령, x100 스케일 (140 = 1.40Hz)
  * </pre>
  *
  * <p>Input Register 쪽에는 {@link DelegatingInputRegister}만 연결했기 때문에 애초에
  * "쓰기(setValue)" 자체가 불가능하다 - 즉 Modbus 마스터는 센서값을 절대 조작할 수 없고
- * 읽기만 할 수 있다. 반대로 Holding Register는 SV/벨트속도라는 "제어값"이라서
+ * 읽기만 할 수 있다. 반대로 Holding Register는 벨트속도라는 "제어값"이라서
  * 읽기/쓰기 둘 다 열어뒀다.</p>
  */
 public final class ModbusServer {
@@ -51,13 +48,10 @@ public final class ModbusServer {
         SimpleProcessImage processImage = new SimpleProcessImage(UNIT_ID);
 
         // ---- Input Register (FC=0x04, 읽기전용) : FactoryState의 센서값을 그대로 연결 ----
-        processImage.addInputRegister(0, new DelegatingInputRegister(state::getFireActualX10));
-        processImage.addInputRegister(1, new DelegatingInputRegister(state::getMoldActualX10));
-        processImage.addInputRegister(2, new DelegatingInputRegister(state::getServedCount));
+        processImage.addInputRegister(0, new DelegatingInputRegister(state::getIrTempX10));
 
         // ---- Holding Register (FC=0x03 읽기 / FC=0x06 쓰기) : FactoryState의 제어값을 연결 ----
-        processImage.addRegister(0, new DelegatingRegister(state::getFireSetpointX10, state::setFireSetpointX10));
-        processImage.addRegister(1, new DelegatingRegister(state::getBeltSpeedX100, state::setBeltSpeedX100));
+        processImage.addRegister(0, new DelegatingRegister(state::getBeltSpeedX100, state::setBeltSpeedX100));
 
         slave = ModbusSlaveFactory.createTCPSlave(port, LISTENER_THREAD_POOL_SIZE);
         slave.addProcessImage(UNIT_ID, processImage);
